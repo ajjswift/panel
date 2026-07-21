@@ -44,6 +44,10 @@ return [
             'local_domain' => env('MAIL_EHLO_DOMAIN', env('SERVER_NAME')),
         ],
 
+        'resend' => [
+            'transport' => 'resend',
+        ],
+
         'ses' => [
             'transport' => 'ses',
         ],
