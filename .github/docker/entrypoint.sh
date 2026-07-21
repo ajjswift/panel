@@ -1,6 +1,18 @@
 #!/bin/ash -e
 cd /app
 
+# Railway's internal MySQL service presents a self-signed TLS chain.
+# When certificate verification is disabled for PDO, also disable it
+# for the MariaDB command-line client used by Laravel's schema loader.
+if [ "${MYSQL_ATTR_SSL_VERIFY_SERVER_CERT:-true}" = "false" ]; then
+    printf '%s\n' \
+        '[client]' \
+        'disable-ssl-verify-server-cert' \
+        > /root/.my.cnf
+
+    chmod 600 /root/.my.cnf
+fi
+
 mkdir -p /var/log/panel/logs/ /var/log/supervisord/ /var/log/nginx/ /var/log/php7/ \
   && chmod 777 /var/log/panel/logs/ \
   && ln -s /app/storage/logs/ /var/log/panel/
