@@ -123,9 +123,10 @@ const GameSlotsContainer = () => {
                     <span className={styles.summary_label}>Combined slot usage</span>
                     <span className={styles.summary_value}>
                         {bytesToString(data.combinedSlotUsageBytes)}
-                        {data.serverDiskBytes > 0 && (
-                            <span className={'text-body-faint text-sm'}> / {bytesToString(data.serverDiskBytes)}</span>
-                        )}
+                        <span className={'text-body-faint text-sm'}>
+                            {' '}
+                            / {data.serverDiskBytes > 0 ? bytesToString(data.serverDiskBytes) : <>&infin;</>}
+                        </span>
                     </span>
                 </div>
                 <div className={styles.summary_tile}>
