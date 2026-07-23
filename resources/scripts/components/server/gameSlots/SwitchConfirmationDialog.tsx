@@ -64,9 +64,7 @@ export default ({ open, onClose, destination, active, overview, onConfirm, submi
                 <label className={'flex items-center gap-2 pt-1 text-body cursor-pointer'}>
                     <Checkbox
                         checked={restartAfter}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                            setRestartAfter(e.currentTarget.checked)
-                        }
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setRestartAfter(e.currentTarget.checked)}
                     />
                     Start the server after switching
                 </label>
