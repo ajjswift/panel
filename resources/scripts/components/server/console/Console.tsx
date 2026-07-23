@@ -22,24 +22,25 @@ import styles from './style.module.css';
 
 const theme = {
     background: th`colors.black`.toString(),
+    foreground: '#e2e6f2',
     cursor: 'transparent',
-    black: th`colors.black`.toString(),
-    red: '#E54B4B',
-    green: '#9ECE58',
-    yellow: '#FAED70',
-    blue: '#396FE2',
-    magenta: '#BB80B3',
-    cyan: '#2DDAFD',
-    white: '#d0d0d0',
-    brightBlack: 'rgba(255, 255, 255, 0.2)',
-    brightRed: '#FF5370',
-    brightGreen: '#C3E88D',
-    brightYellow: '#FFCB6B',
-    brightBlue: '#82AAFF',
-    brightMagenta: '#C792EA',
-    brightCyan: '#89DDFF',
-    brightWhite: '#ffffff',
-    selection: '#FAF089',
+    black: '#171c2b',
+    red: '#f97066',
+    green: '#4ade80',
+    yellow: '#fdb022',
+    blue: '#c084fc',
+    magenta: '#e879f9',
+    cyan: '#ffb066',
+    white: '#e2e6f2',
+    brightBlack: '#6e758c',
+    brightRed: '#fda29b',
+    brightGreen: '#86efac',
+    brightYellow: '#fedf89',
+    brightBlue: '#d8b4fe',
+    brightMagenta: '#f0abfc',
+    brightCyan: '#ffd9b8',
+    brightWhite: '#f7f8fc',
+    selection: 'rgba(168, 85, 247, 0.35)',
 };
 
 const terminalProps: ITerminalOptions = {
@@ -222,7 +223,7 @@ export default () => {
                     />
                     <div
                         className={classNames(
-                            'text-[#a8b0c3] peer-focus:text-[#f7f8fc] peer-focus:animate-pulse',
+                            'text-[#a6acbc] peer-focus:text-primary-400 peer-focus:animate-pulse',
                             styles.command_icon
                         )}
                     >

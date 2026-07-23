@@ -41,7 +41,7 @@
             }
 
             &::-webkit-scrollbar-thumb {
-                @apply bg-gray-900;
+                @apply bg-[#3c435c];
             }
         }
     }
@@ -51,15 +51,15 @@
     }
 
     & .command_input {
-        /* The terminal stays dark in both themes, so the command input uses
-         * fixed dark colors rather than theme-aware ones. */
-        @apply relative bg-[#060a1c] px-2 text-[#e2e6f2] pl-10 pr-4 py-2 w-full font-mono text-sm sm:rounded-b;
+        /* Keep the terminal dark in both themes, but use the same navy surface,
+         * text, border, and brand colors as the rest of the panel. */
+        @apply relative bg-[#171c2b] px-2 text-[#e2e6f2] pl-10 pr-4 py-2 w-full font-mono text-sm sm:rounded-b;
         @apply focus:ring-0 outline-none focus-visible:outline-none;
-        @apply border-0 border-b-2 border-transparent transition-colors duration-100;
-        @apply active:border-cyan-500 focus:border-cyan-500;
+        @apply border-0 border-t border-b-2 border-t-[#282e42] border-b-transparent transition-colors duration-100;
+        @apply active:border-b-primary-400 focus:border-b-primary-400;
 
         &::placeholder {
-            @apply text-[#6c769c];
+            @apply text-[#6e758c];
         }
     }
 }
