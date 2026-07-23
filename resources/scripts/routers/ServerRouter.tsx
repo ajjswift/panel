@@ -30,6 +30,7 @@ export default () => {
     const uuid = ServerContext.useStoreState((state) => state.server.data?.uuid);
     const inConflictState = ServerContext.useStoreState((state) => state.server.inConflictState);
     const isSwitchingGame = ServerContext.useStoreState((state) => state.server.data?.status === 'switching_game');
+    const featureLimits = ServerContext.useStoreState((state) => state.server.data?.featureLimits);
     const serverId = ServerContext.useStoreState((state) => state.server.data?.internalId);
     const getServer = ServerContext.useStoreActions((actions) => actions.server.getServer);
     const clearServerState = ServerContext.useStoreActions((actions) => actions.clearServerState);
@@ -41,7 +42,21 @@ export default () => {
         return `${(url ? match.url : match.path).replace(/\/*$/, '')}/${value.replace(/^\/+/, '')}`;
     };
 
-    const visible = routes.server.filter((route) => !!route.name);
+    const visible = routes.server.filter((route) => {
+        if (!route.name) {
+            return false;
+        }
+
+        if (route.path === '/game-slots') {
+            return (featureLimits?.gameSlots ?? 0) > 1;
+        }
+
+        if (route.path === '/backups') {
+            return (featureLimits?.backups ?? 0) > 0;
+        }
+
+        return true;
+    });
     const sections: SidebarSection[] = [
         {
             items: [{ label: 'Dashboard', icon: faLayerGroup, to: '/', exact: true }],
@@ -123,10 +138,6 @@ export default () => {
                         <TransferListener />
                         <WebsocketHandler />
                         {inConflictState &&
-                        // The Game Slots page stays reachable while a game switch is in
-                        // progress so the user can watch the operation's progress and it
-                        // is the one screen that explains the temporary lock.
-                        !(isSwitchingGame && location.pathname.endsWith(`/server/${id}/game-slots`)) &&
                         (!rootAdmin || (rootAdmin && !location.pathname.endsWith(`/server/${id}`))) ? (
                             <ConflictStateRenderer />
                         ) : (

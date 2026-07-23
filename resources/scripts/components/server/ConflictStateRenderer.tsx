@@ -20,9 +20,9 @@ export default () => {
         />
     ) : status === 'switching_game' ? (
         <ScreenBlock
-            title={'Switching Games'}
+            title={'Switching'}
             image={ServerRestoreSvg}
-            message={'This server is switching between game slots. Open the Game Slots page to follow the progress.'}
+            message={'This server is switching between game slots. Please check back once it has finished.'}
         />
     ) : status === 'suspended' ? (
         <ScreenBlock

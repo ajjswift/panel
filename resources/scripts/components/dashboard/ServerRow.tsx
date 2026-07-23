@@ -138,6 +138,8 @@ export default ({ server, className }: { server: Server; className?: string }) =
                                     ? 'Installing'
                                     : server.status === 'restoring_backup'
                                     ? 'Restoring Backup'
+                                    : server.status === 'switching_game'
+                                    ? 'Switching'
                                     : 'Unavailable'}
                             </span>
                         </div>

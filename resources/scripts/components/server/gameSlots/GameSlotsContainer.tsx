@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useHistory } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlus } from '@fortawesome/free-solid-svg-icons';
 import ServerContentBlock from '@/components/elements/ServerContentBlock';
@@ -20,12 +21,9 @@ import SwitchProgress from './SwitchProgress';
 import styles from './gameSlots.module.css';
 
 const GameSlotsContainer = () => {
+    const history = useHistory();
     const { clearFlashes, clearAndAddHttpError } = useFlash();
-    const [canCreate, canSwitch, canDelete] = usePermissions([
-        'gameslot.create',
-        'gameslot.switch',
-        'gameslot.delete',
-    ]);
+    const [canCreate, canSwitch, canDelete] = usePermissions(['gameslot.create', 'gameslot.switch', 'gameslot.delete']);
     const uuid = ServerContext.useStoreState((state) => state.server.data!.uuid);
     const serverStatus = ServerContext.useStoreState((state) => state.server.data?.status ?? null);
 
@@ -71,6 +69,20 @@ const GameSlotsContainer = () => {
         } catch (e) {
             clearAndAddHttpError({ key: 'game-slots', error: e });
         } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const startSwitch = async (slot: GameSlot, restartAfter: boolean) => {
+        setSubmitting(true);
+        clearFlashes('game-slots');
+
+        try {
+            await activateGameSlot(uuid, slot.uuid, restartAfter);
+            setSwitchTarget(null);
+            history.replace('/');
+        } catch (e) {
+            clearAndAddHttpError({ key: 'game-slots', error: e });
             setSubmitting(false);
         }
     };
@@ -155,7 +167,11 @@ const GameSlotsContainer = () => {
                 onClose={() => setCreateOpen(false)}
                 submitting={submitting}
                 onCreate={(payload) =>
-                    withSubmit('game-slots', () => createGameSlot(uuid, payload), () => setCreateOpen(false))
+                    withSubmit(
+                        'game-slots',
+                        () => createGameSlot(uuid, payload),
+                        () => setCreateOpen(false)
+                    )
                 }
             />
 
@@ -168,11 +184,7 @@ const GameSlotsContainer = () => {
                 submitting={submitting}
                 onConfirm={(restartAfter) => {
                     if (!switchTarget) return;
-                    void withSubmit(
-                        'game-slots',
-                        () => activateGameSlot(uuid, switchTarget.uuid, restartAfter),
-                        () => setSwitchTarget(null)
-                    );
+                    void startSwitch(switchTarget, restartAfter);
                 }}
             />
 
