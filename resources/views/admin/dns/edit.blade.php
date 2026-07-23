@@ -45,14 +45,14 @@
             <div class="box">
                 <div class="box-header with-border"><h3 class="box-title">Eligibility</h3></div>
                 <div class="box-body row">
-                    <div class="form-group col-md-4"><label>Allowed nodes (empty means all)</label><select name="allowed_node_ids[]" multiple class="form-control">
-                        @foreach($nodes as $node)<option value="{{ $node->id }}" @selected(in_array($node->id, $domain->allowed_node_ids ?? []))>{{ $node->name }}</option>@endforeach
+                    <div class="form-group col-md-4"><label>Allowed nodes (empty means all)</label><select id="allowedNodeIds" name="allowed_node_ids[]" multiple class="form-control managed-dns-multiselect" data-placeholder="All nodes">
+                        @foreach($nodes as $node)<option value="{{ $node->id }}" @selected(in_array($node->id, old('allowed_node_ids', $domain->allowed_node_ids ?? [])))>{{ $node->name }}</option>@endforeach
                     </select></div>
-                    <div class="form-group col-md-4"><label>Allowed eggs (empty means all)</label><select name="allowed_egg_ids[]" multiple class="form-control">
-                        @foreach($eggs as $egg)<option value="{{ $egg->id }}" @selected(in_array($egg->id, $domain->allowed_egg_ids ?? []))>{{ $egg->name }}</option>@endforeach
+                    <div class="form-group col-md-4"><label>Allowed eggs (empty means all)</label><select id="allowedEggIds" name="allowed_egg_ids[]" multiple class="form-control managed-dns-multiselect" data-placeholder="All eggs">
+                        @foreach($eggs as $egg)<option value="{{ $egg->id }}" @selected(in_array($egg->id, old('allowed_egg_ids', $domain->allowed_egg_ids ?? [])))>{{ $egg->name }}</option>@endforeach
                     </select></div>
-                    <div class="form-group col-md-4"><label>Allowed service profiles</label><select name="allowed_service_profile_ids[]" multiple class="form-control">
-                        @foreach($profiles as $profile)<option value="{{ $profile->id }}" @selected(in_array($profile->id, $domain->allowed_service_profile_ids ?? []))>{{ $profile->name }}</option>@endforeach
+                    <div class="form-group col-md-4"><label>Allowed service profiles</label><select id="allowedServiceProfileIds" name="allowed_service_profile_ids[]" multiple class="form-control managed-dns-multiselect" data-placeholder="All service profiles">
+                        @foreach($profiles as $profile)<option value="{{ $profile->id }}" @selected(in_array($profile->id, old('allowed_service_profile_ids', $domain->allowed_service_profile_ids ?? [])))>{{ $profile->name }}</option>@endforeach
                     </select></div>
                     <div class="form-group col-md-6"><label>User-facing description</label><textarea name="description" class="form-control">{{ $domain->description }}</textarea></div>
                     <div class="form-group col-md-6"><label>Administrator notes</label><textarea name="admin_notes" class="form-control">{{ $domain->admin_notes }}</textarea></div>
@@ -69,4 +69,19 @@
         <span class="text-muted" style="margin-left:10px">Last result: {{ $domain->last_provider_status ?? 'not tested' }}</span>
     </div>
 </div>
+@endsection
+
+@section('footer-scripts')
+    @parent
+    <script>
+        $(function () {
+            $('.managed-dns-multiselect').each(function () {
+                $(this).select2({
+                    closeOnSelect: false,
+                    placeholder: $(this).data('placeholder'),
+                    width: '100%'
+                });
+            });
+        });
+    </script>
 @endsection

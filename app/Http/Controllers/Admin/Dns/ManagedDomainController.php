@@ -210,6 +210,9 @@ class ManagedDomainController extends Controller
             ->unique()
             ->values()
             ->all();
+        $data['allowed_node_ids'] = $request->input('allowed_node_ids', []);
+        $data['allowed_egg_ids'] = $request->input('allowed_egg_ids', []);
+        $data['allowed_service_profile_ids'] = $request->input('allowed_service_profile_ids', []);
 
         if (!$request->filled('api_token')) {
             unset($data['api_token']);
