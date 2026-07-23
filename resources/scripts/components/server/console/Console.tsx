@@ -53,8 +53,14 @@ const terminalProps: ITerminalOptions = {
     theme: theme,
 };
 
+const ANSI_RESET = '\u001b[0m';
+const PANEL_LABEL_STYLE = '\u001b[1m\u001b[38;2;216;180;254m';
+const panelLabel = (label: string) => `${PANEL_LABEL_STYLE}${label}${ANSI_RESET}`;
+const colorizePanelLabels = (line: string) =>
+    line.replace('[SolsticeHosting Daemon]:', panelLabel('[SolsticeHosting Daemon]:'));
+
 export default () => {
-    const TERMINAL_PRELUDE = '\u001b[1m\u001b[33mcontainer@solstice~ \u001b[0m';
+    const TERMINAL_PRELUDE = panelLabel('container@solstice~ ');
     const ref = useRef<HTMLDivElement>(null);
     const terminal = useMemo(() => new Terminal({ ...terminalProps }), []);
     const fitAddon = new FitAddon();
@@ -76,7 +82,9 @@ export default () => {
     }`;
 
     const handleConsoleOutput = (line: string, prelude = false) =>
-        terminal.writeln((prelude ? TERMINAL_PRELUDE : '') + line.replace(/(?:\r\n|\r|\n)$/im, '') + '\u001b[0m');
+        terminal.writeln(
+            (prelude ? TERMINAL_PRELUDE : '') + colorizePanelLabels(line.replace(/(?:\r\n|\r|\n)$/im, '')) + ANSI_RESET
+        );
 
     const handleTransferStatus = (status: string) => {
         switch (status) {
