@@ -65,6 +65,14 @@ class Permission extends Model
 
     public const ACTION_ACTIVITY_READ = 'activity.read';
 
+    public const ACTION_GAMESLOT_READ = 'gameslot.read';
+    public const ACTION_GAMESLOT_CREATE = 'gameslot.create';
+    public const ACTION_GAMESLOT_UPDATE = 'gameslot.update';
+    public const ACTION_GAMESLOT_STARTUP = 'gameslot.startup';
+    public const ACTION_GAMESLOT_SWITCH = 'gameslot.switch';
+    public const ACTION_GAMESLOT_DELETE = 'gameslot.delete';
+    public const ACTION_GAMESLOT_HISTORY = 'gameslot.history';
+
     /**
      * Should timestamps be used on this model.
      */
@@ -204,6 +212,19 @@ class Permission extends Model
             'description' => 'Permissions that control a user\'s access to the server activity logs.',
             'keys' => [
                 'read' => 'Allows a user to view the activity logs for the server.',
+            ],
+        ],
+
+        'gameslot' => [
+            'description' => 'Permissions that control a user\'s access to the game slots on this server.',
+            'keys' => [
+                'read' => 'Allows a user to view the game slots that exist for this server.',
+                'create' => 'Allows a user to create a new game slot for this server.',
+                'update' => 'Allows a user to rename game slots and edit their notes.',
+                'startup' => 'Allows a user to edit a game slot\'s startup variables and Docker image.',
+                'switch' => 'Allows a user to switch the server between game slots. This stops the running game.',
+                'delete' => 'Allows a user to permanently delete inactive game slots, including their files.',
+                'history' => 'Allows a user to view the history of game switch operations for this server.',
             ],
         ],
     ];

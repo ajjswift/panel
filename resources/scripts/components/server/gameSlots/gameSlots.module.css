@@ -1,0 +1,126 @@
+.summary_grid {
+    @apply grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6;
+}
+
+.summary_tile {
+    @apply bg-surface border border-line rounded-lg p-4 flex flex-col gap-1;
+}
+
+.summary_label {
+    @apply text-2xs font-semibold uppercase tracking-wider text-body-faint;
+}
+
+.summary_value {
+    @apply text-lg font-semibold text-body truncate;
+}
+
+.slot_grid {
+    @apply grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4;
+}
+
+.slot_card {
+    @apply relative flex flex-col bg-surface border border-line rounded-lg p-4 shadow-sm transition-colors duration-150;
+}
+
+.slot_card.active {
+    /* Gradient outline for the active slot, over a solid surface so text stays
+     * fully readable. Paired with an explicit "Active" badge so state is never
+     * conveyed through the accent alone. */
+    border-color: transparent;
+    background:
+        linear-gradient(rgb(var(--color-surface)), rgb(var(--color-surface))) padding-box,
+        var(--gradient-brand) border-box;
+}
+
+.slot_header {
+    @apply flex items-start gap-3 mb-3;
+}
+
+.slot_icon {
+    @apply flex items-center justify-center w-10 h-10 rounded-md bg-page border border-line shrink-0 text-body-muted;
+}
+
+.slot_name {
+    @apply text-sm font-semibold text-body truncate;
+}
+
+.slot_game {
+    @apply text-xs text-body-muted truncate;
+}
+
+.badge {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-semibold uppercase tracking-wide;
+}
+
+.badge_active {
+    color: #fff;
+    background-image: var(--gradient-brand);
+}
+
+.badge_neutral {
+    @apply bg-page text-body-muted border border-line;
+}
+
+.badge_warning {
+    @apply text-warning-text;
+    background: rgb(var(--color-warning) / 0.12);
+}
+
+.badge_danger {
+    @apply text-danger-text;
+    background: rgb(var(--color-danger) / 0.12);
+}
+
+.badge_success {
+    @apply text-success-text;
+    background: rgb(var(--color-success) / 0.12);
+}
+
+.slot_meta {
+    @apply grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-body-muted mt-1 mb-4;
+}
+
+.slot_meta dt {
+    @apply text-body-faint;
+}
+
+.slot_meta dd {
+    @apply text-body font-medium truncate;
+}
+
+.slot_actions {
+    @apply flex items-center gap-2 mt-auto pt-2 flex-wrap;
+}
+
+.progress_wrap {
+    @apply bg-surface border border-line rounded-lg p-5 mb-6;
+}
+
+.progress_track {
+    @apply relative h-2 rounded-full bg-page overflow-hidden mt-3;
+}
+
+.progress_fill {
+    @apply absolute inset-y-0 left-0 rounded-full transition-[width] duration-500 ease-out;
+    background-image: var(--gradient-brand);
+}
+
+.stage_list {
+    @apply mt-4 space-y-1.5;
+}
+
+.stage_row {
+    @apply flex items-center gap-2 text-sm text-body-muted;
+}
+
+.stage_row.done {
+    @apply text-body;
+}
+
+.stage_row.current {
+    @apply text-body font-medium;
+}
+
+.stage_dot {
+    @apply inline-flex items-center justify-center w-4 h-4 shrink-0;
+}

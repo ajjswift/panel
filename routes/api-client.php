@@ -150,4 +150,26 @@ Route::group([
         Route::post('/reinstall', [Client\Servers\SettingsController::class, 'reinstall']);
         Route::put('/docker-image', [Client\Servers\SettingsController::class, 'dockerImage']);
     });
+
+    Route::group(['prefix' => '/game-slots'], function () {
+        Route::get('/', [Client\Servers\GameSlotController::class, 'index'])->name('api:client:server.game-slots.index');
+        Route::get('/templates', [Client\Servers\GameSlotTemplateController::class, 'index']);
+        Route::post('/', [Client\Servers\GameSlotController::class, 'store']);
+
+        Route::get('/operations', [Client\Servers\GameSwitchOperationController::class, 'index'])
+            ->name('api:client:server.game-slots.operations.index');
+        Route::get('/operations/current', [Client\Servers\GameSwitchOperationController::class, 'current'])
+            ->name('api:client:server.game-slots.operations.current');
+        Route::get('/operations/{gameSwitchOperation}', [Client\Servers\GameSwitchOperationController::class, 'view'])
+            ->name('api:client:server.game-slots.operations.view');
+        Route::post('/operations/{gameSwitchOperation}/retry', [Client\Servers\GameSwitchOperationController::class, 'retry'])
+            ->middleware('throttle:2,1');
+
+        Route::get('/{gameSlot}', [Client\Servers\GameSlotController::class, 'view']);
+        Route::patch('/{gameSlot}', [Client\Servers\GameSlotController::class, 'update']);
+        Route::put('/{gameSlot}/startup', [Client\Servers\GameSlotController::class, 'updateStartup']);
+        Route::post('/{gameSlot}/activate', [Client\Servers\GameSlotController::class, 'activate'])
+            ->middleware('throttle:2,1');
+        Route::delete('/{gameSlot}', [Client\Servers\GameSlotController::class, 'delete']);
+    });
 });

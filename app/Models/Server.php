@@ -43,6 +43,7 @@ use Pterodactyl\Exceptions\Http\Server\ServerStateConflictException;
  * @property int|null $allocation_limit
  * @property int|null $database_limit
  * @property int $backup_limit
+ * @property int $game_slot_limit
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @property \Illuminate\Support\Carbon|null $installed_at
@@ -124,6 +125,7 @@ class Server extends Model implements Identifiable
     public const STATUS_REINSTALL_FAILED = 'reinstall_failed';
     public const STATUS_SUSPENDED = 'suspended';
     public const STATUS_RESTORING_BACKUP = 'restoring_backup';
+    public const STATUS_SWITCHING_GAME = 'switching_game';
 
     /**
      * The table associated with the model.
@@ -173,6 +175,7 @@ class Server extends Model implements Identifiable
         'database_limit' => 'present|nullable|integer|min:0',
         'allocation_limit' => 'sometimes|nullable|integer|min:0',
         'backup_limit' => 'present|nullable|integer|min:0',
+        'game_slot_limit' => 'sometimes|integer|min:1|max:100',
     ];
 
     /**
@@ -194,6 +197,7 @@ class Server extends Model implements Identifiable
         'database_limit' => 'integer',
         'allocation_limit' => 'integer',
         'backup_limit' => 'integer',
+        'game_slot_limit' => 'integer',
         self::CREATED_AT => 'datetime',
         self::UPDATED_AT => 'datetime',
         'deleted_at' => 'datetime',
@@ -361,6 +365,51 @@ class Server extends Model implements Identifiable
     }
 
     /**
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany<\Pterodactyl\Models\GameSlot, $this>
+     */
+    public function gameSlots(): HasMany
+    {
+        return $this->hasMany(GameSlot::class);
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Relations\HasOne<\Pterodactyl\Models\GameSlot, $this>
+     */
+    public function activeGameSlot(): HasOne
+    {
+        return $this->hasOne(GameSlot::class)->where('is_active', true);
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany<\Pterodactyl\Models\GameSwitchOperation, $this>
+     */
+    public function gameSwitchOperations(): HasMany
+    {
+        return $this->hasMany(GameSwitchOperation::class);
+    }
+
+    /**
+     * The currently pending or running game switch operation, if any.
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasOne<\Pterodactyl\Models\GameSwitchOperation, $this>
+     */
+    public function activeGameSwitchOperation(): HasOne
+    {
+        return $this->hasOne(GameSwitchOperation::class)
+            ->whereIn('state', GameSwitchOperation::ACTIVE_STATES)
+            ->orderByDesc('id');
+    }
+
+    /**
+     * Whether the game switching feature is in play for this server: either the
+     * allowance is above one or slots have already been created.
+     */
+    public function usesGameSlots(): bool
+    {
+        return $this->game_slot_limit > 1 || $this->gameSlots()->exists();
+    }
+
+    /**
      * Returns all mounts that have this server has mounted.
      *
      * @return \Illuminate\Database\Eloquent\Relations\HasManyThrough<\Pterodactyl\Models\Mount, \Pterodactyl\Models\MountServer, $this>
@@ -394,6 +443,7 @@ class Server extends Model implements Identifiable
             || $this->node->isUnderMaintenance()
             || !$this->isInstalled()
             || $this->status === self::STATUS_RESTORING_BACKUP
+            || $this->status === self::STATUS_SWITCHING_GAME
             || !is_null($this->transfer)
         ) {
             throw new ServerStateConflictException($this);

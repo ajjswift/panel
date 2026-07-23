@@ -4,6 +4,7 @@ namespace Pterodactyl\Services\Servers;
 
 use Pterodactyl\Models\Mount;
 use Pterodactyl\Models\Server;
+use Pterodactyl\Models\GameSlotStorage;
 
 class ServerConfigurationStructureService
 {
@@ -86,9 +87,28 @@ class ServerConfigurationStructureService
             }),
             'egg' => [
                 'id' => $server->egg->uuid,
-                'file_denylist' => $server->egg->inherit_file_denylist,
+                'file_denylist' => $this->fileDenylist($server),
             ],
         ];
+    }
+
+    /**
+     * The egg's file denylist, extended with the game-slot store patterns for
+     * servers that use game slots. This makes Wings deny file manager, SFTP,
+     * and backup access to inactive slot data. The patterns are intentionally
+     * omitted while a switch is running so the Panel's own file operations can
+     * move data in and out of the store — users are locked out during that
+     * window by the server's "switching_game" status.
+     */
+    private function fileDenylist(Server $server): array
+    {
+        $denylist = $server->egg->inherit_file_denylist;
+
+        if ($server->status !== Server::STATUS_SWITCHING_GAME && $server->usesGameSlots()) {
+            $denylist = array_values(array_unique(array_merge($denylist ?? [], GameSlotStorage::DENYLIST_PATTERNS)));
+        }
+
+        return $denylist ?? [];
     }
 
     /**

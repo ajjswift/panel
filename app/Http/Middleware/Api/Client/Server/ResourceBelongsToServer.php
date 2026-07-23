@@ -9,9 +9,11 @@ use Pterodactyl\Models\Backup;
 use Pterodactyl\Models\Server;
 use Pterodactyl\Models\Subuser;
 use Pterodactyl\Models\Database;
+use Pterodactyl\Models\GameSlot;
 use Pterodactyl\Models\Schedule;
 use Pterodactyl\Models\Allocation;
 use Illuminate\Database\Eloquent\Model;
+use Pterodactyl\Models\GameSwitchOperation;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 class ResourceBelongsToServer
@@ -51,6 +53,8 @@ class ResourceBelongsToServer
                 case Database::class:
                 case Schedule::class:
                 case Subuser::class:
+                case GameSlot::class:
+                case GameSwitchOperation::class:
                     if ($model->server_id !== $server->id) {
                         throw $exception;
                     }

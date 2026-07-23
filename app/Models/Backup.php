@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 /**
  * @property int $id
  * @property int $server_id
+ * @property int|null $game_slot_id
  * @property string $uuid
  * @property bool $is_successful
  * @property bool $is_locked
@@ -46,6 +47,7 @@ class Backup extends Model implements Identifiable
 
     protected $casts = [
         'id' => 'int',
+        'game_slot_id' => 'int',
         'is_successful' => 'bool',
         'is_locked' => 'bool',
         'ignored_files' => 'array',
@@ -82,5 +84,16 @@ class Backup extends Model implements Identifiable
     public function server(): BelongsTo
     {
         return $this->belongsTo(Server::class);
+    }
+
+    /**
+     * The game slot that was active when this backup was created. Null for
+     * backups taken before game slots existed on the server.
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo<\Pterodactyl\Models\GameSlot, $this>
+     */
+    public function gameSlot(): BelongsTo
+    {
+        return $this->belongsTo(GameSlot::class);
     }
 }

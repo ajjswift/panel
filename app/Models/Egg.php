@@ -28,6 +28,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
  * @property int|null $config_from
  * @property string|null $startup
  * @property bool $script_is_privileged
+ * @property bool $game_switch_enabled
  * @property string|null $script_install
  * @property string $script_entry
  * @property string $script_container
@@ -105,6 +106,7 @@ class Egg extends Model implements Identifiable
         'script_entry',
         'script_container',
         'copy_script_from',
+        'game_switch_enabled',
     ];
 
     /**
@@ -114,6 +116,7 @@ class Egg extends Model implements Identifiable
         'nest_id' => 'integer',
         'config_from' => 'integer',
         'script_is_privileged' => 'boolean',
+        'game_switch_enabled' => 'boolean',
         'force_outgoing_ip' => 'boolean',
         'copy_script_from' => 'integer',
         'features' => 'array',

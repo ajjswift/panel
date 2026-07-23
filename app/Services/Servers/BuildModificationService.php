@@ -11,6 +11,7 @@ use Pterodactyl\Exceptions\DisplayException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Pterodactyl\Repositories\Wings\DaemonServerRepository;
 use Pterodactyl\Exceptions\Http\Connection\DaemonConnectionException;
+use Pterodactyl\Services\GameSlots\GameSlotLimitReconciliationService;
 
 class BuildModificationService
 {
@@ -21,6 +22,7 @@ class BuildModificationService
         private ConnectionInterface $connection,
         private DaemonServerRepository $daemonServerRepository,
         private ServerConfigurationStructureService $structureService,
+        private GameSlotLimitReconciliationService $slotReconciliationService,
     ) {
     }
 
@@ -52,7 +54,17 @@ class BuildModificationService
                 'database_limit' => Arr::get($data, 'database_limit', 0) ?? null,
                 'allocation_limit' => Arr::get($data, 'allocation_limit', 0) ?? null,
                 'backup_limit' => Arr::get($data, 'backup_limit', 0) ?? 0,
+                // A slot limit of at least 1 is always enforced; reducing the
+                // limit never deletes existing slots (see the reconciliation in
+                // the game-slot services), it only prevents new ones.
+                'game_slot_limit' => max(1, (int) Arr::get($data, 'game_slot_limit', $server->game_slot_limit)),
             ]))->saveOrFail();
+
+            // Reconcile slot state with the (possibly reduced) allowance without
+            // ever deleting customer data.
+            if ($server->usesGameSlots()) {
+                $this->slotReconciliationService->handle($server);
+            }
 
             return $server->refresh();
         });

@@ -129,5 +129,14 @@ return [
             'update' => 'Updated the subuser permissions for :email',
             'delete' => 'Removed :email as a subuser',
         ],
+        'gameslot' => [
+            'create' => 'Created the :name game slot',
+            'update' => 'Updated the :name game slot',
+            'startup' => 'Updated the startup configuration for the :name game slot',
+            'delete' => 'Deleted the :name game slot',
+            'switch-start' => 'Started switching from :source to :destination',
+            'switch-complete' => 'Completed switching to the :destination game',
+            'switch-failed' => 'Failed to switch to the :destination game',
+        ],
     ],
 ];

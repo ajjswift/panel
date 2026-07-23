@@ -18,6 +18,12 @@ export default () => {
             image={ServerInstallSvg}
             message={'Your server should be ready soon, please try again in a few minutes.'}
         />
+    ) : status === 'switching_game' ? (
+        <ScreenBlock
+            title={'Switching Games'}
+            image={ServerRestoreSvg}
+            message={'This server is switching between game slots. Open the Game Slots page to follow the progress.'}
+        />
     ) : status === 'suspended' ? (
         <ScreenBlock
             title={'Server Suspended'}

@@ -101,6 +101,17 @@
                                     </p>
                                 </div>
                             </div>
+                            <div class="form-group">
+                                <div class="checkbox checkbox-primary no-margin-bottom">
+                                    <input id="pGameSwitchEnabled" name="game_switch_enabled" type="checkbox" value="1" @if($egg->game_switch_enabled) checked @endif />
+                                    <label for="pGameSwitchEnabled" class="strong">Allow in Game Switching</label>
+                                    <p class="text-muted small">
+                                        Allows customers to select this game when creating a game slot and to switch to it.
+                                        Only enable this for eggs that install and run cleanly with no special network behavior,
+                                        and whose install scripts you trust to run for customer-driven switches.
+                                    </p>
+                                </div>
+                            </div>
 
                         </div>
                         <div class="col-sm-6">

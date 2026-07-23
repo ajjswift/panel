@@ -7,6 +7,7 @@ import {
     faDatabase,
     faFingerprint,
     faFolderOpen,
+    faGamepad,
     faKey,
     faNetworkWired,
     faRocket,
@@ -37,6 +38,7 @@ import ServerActivityLogContainer from '@/components/server/ServerActivityLogCon
 // for the server dashboard when they're only needed for specific instances.
 const FileEditContainer = lazy(() => import('@/components/server/files/FileEditContainer'));
 const ScheduleEditContainer = lazy(() => import('@/components/server/schedules/ScheduleEditContainer'));
+const GameSlotsContainer = lazy(() => import('@/components/server/gameSlots/GameSlotsContainer'));
 
 interface RouteDefinition {
     path: string;
@@ -98,6 +100,13 @@ export default {
             icon: faTerminal,
             component: ServerConsole,
             exact: true,
+        },
+        {
+            path: '/game-slots',
+            permission: 'gameslot.*',
+            name: 'Game Slots',
+            icon: faGamepad,
+            component: GameSlotsContainer,
         },
         {
             path: '/files',

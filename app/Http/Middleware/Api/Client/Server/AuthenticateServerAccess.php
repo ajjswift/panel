@@ -55,14 +55,33 @@ class AuthenticateServerAccess
                 if (($server->isSuspended() || $server->node->isUnderMaintenance()) && !$request->routeIs('api:client:server.resources')) {
                     throw $exception;
                 }
+                // While a game switch is running, read-only game-slot endpoints stay
+                // available so clients can poll the operation's progress.
+                if (
+                    $server->status === Server::STATUS_SWITCHING_GAME
+                    && $request->isMethod('GET')
+                    && $request->routeIs(
+                        'api:client:server.game-slots.index',
+                        'api:client:server.game-slots.operations.index',
+                        'api:client:server.game-slots.operations.current',
+                        'api:client:server.game-slots.operations.view',
+                    )
+                ) {
+                    return $next($this->passServer($request, $server));
+                }
                 if (!$user->root_admin || !$request->routeIs($this->except)) {
                     throw $exception;
                 }
             }
         }
 
+        return $next($this->passServer($request, $server));
+    }
+
+    private function passServer(Request $request, Server $server): Request
+    {
         $request->attributes->set('server', $server);
 
-        return $next($request);
+        return $request;
     }
 }

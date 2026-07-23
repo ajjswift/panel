@@ -29,6 +29,7 @@ export default () => {
     const id = ServerContext.useStoreState((state) => state.server.data?.id);
     const uuid = ServerContext.useStoreState((state) => state.server.data?.uuid);
     const inConflictState = ServerContext.useStoreState((state) => state.server.inConflictState);
+    const isSwitchingGame = ServerContext.useStoreState((state) => state.server.data?.status === 'switching_game');
     const serverId = ServerContext.useStoreState((state) => state.server.data?.internalId);
     const getServer = ServerContext.useStoreActions((actions) => actions.server.getServer);
     const clearServerState = ServerContext.useStoreActions((actions) => actions.clearServerState);
@@ -55,6 +56,10 @@ export default () => {
                     to: to(route.path, true),
                     exact: route.exact,
                     permission: route.permission,
+                    indicator:
+                        route.path === '/game-slots' && isSwitchingGame
+                            ? ({ label: 'Switching games', tone: 'active' } as const)
+                            : undefined,
                 })),
         },
         {
@@ -118,6 +123,10 @@ export default () => {
                         <TransferListener />
                         <WebsocketHandler />
                         {inConflictState &&
+                        // The Game Slots page stays reachable while a game switch is in
+                        // progress so the user can watch the operation's progress and it
+                        // is the one screen that explains the temporary lock.
+                        !(isSwitchingGame && location.pathname.endsWith(`/server/${id}/game-slots`)) &&
                         (!rootAdmin || (rootAdmin && !location.pathname.endsWith(`/server/${id}`))) ? (
                             <ConflictStateRenderer />
                         ) : (

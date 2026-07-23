@@ -120,6 +120,12 @@ Route::group(['prefix' => 'servers'], function () {
     Route::get('/view/{server:id}/manage', [Admin\Servers\ServerViewController::class, 'manage'])->name('admin.servers.view.manage');
     Route::get('/view/{server:id}/delete', [Admin\Servers\ServerViewController::class, 'delete'])->name('admin.servers.view.delete');
 
+    Route::get('/view/{server:id}/game-slots', [Admin\Servers\GameSlotRecoveryController::class, 'index'])->name('admin.servers.view.game-slots');
+    Route::post('/view/{server:id}/game-slots/operations/{operation}/retry', [Admin\Servers\GameSlotRecoveryController::class, 'retry'])->name('admin.servers.view.game-slots.retry');
+    Route::post('/view/{server:id}/game-slots/clear-lock', [Admin\Servers\GameSlotRecoveryController::class, 'clearLock'])->name('admin.servers.view.game-slots.clear-lock');
+    Route::post('/view/{server:id}/game-slots/{slot}/force-active', [Admin\Servers\GameSlotRecoveryController::class, 'forceActive'])->name('admin.servers.view.game-slots.force-active');
+    Route::post('/view/{server:id}/game-slots/{slot}/toggle-disabled', [Admin\Servers\GameSlotRecoveryController::class, 'toggleDisabled'])->name('admin.servers.view.game-slots.toggle-disabled');
+
     Route::post('/new', [Admin\Servers\CreateServerController::class, 'store']);
     Route::post('/view/{server:id}/build', [Admin\ServersController::class, 'updateBuild']);
     Route::post('/view/{server:id}/startup', [Admin\ServersController::class, 'saveStartup']);

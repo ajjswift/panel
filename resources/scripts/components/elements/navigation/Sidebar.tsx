@@ -33,6 +33,9 @@ export interface SidebarItem {
     // When set the item is wrapped in a <Can> check (server context only).
     permission?: string | string[] | null;
     external?: boolean;
+    // Optional short status indicator (e.g. "switching"). Rendered as a small
+    // pulsing dot with an accessible label so it reads without color alone.
+    indicator?: { label: string; tone: 'active' | 'warning' | 'danger' };
 }
 
 export interface SidebarSection {
@@ -62,10 +65,38 @@ const WithTooltip = ({ show, label, children }: { show: boolean; label: string; 
         children
     );
 
+const toneClass: Record<'active' | 'warning' | 'danger', string> = {
+    active: 'bg-primary-400',
+    warning: 'bg-warning',
+    danger: 'bg-danger',
+};
+
 const ItemContent = ({ item, collapsed }: { item: SidebarItem; collapsed: boolean }) => (
     <>
-        <FontAwesomeIcon icon={item.icon} fixedWidth />
+        <span className={'relative'}>
+            <FontAwesomeIcon icon={item.icon} fixedWidth />
+            {item.indicator && collapsed && (
+                <span
+                    className={classNames(
+                        'absolute -top-1 -right-1 w-2 h-2 rounded-full animate-pulse',
+                        toneClass[item.indicator.tone]
+                    )}
+                    aria-hidden
+                />
+            )}
+        </span>
         {!collapsed && <span className={styles.label}>{item.label}</span>}
+        {!collapsed && item.indicator && (
+            <span
+                className={classNames('inline-flex items-center gap-1 text-2xs font-medium text-body-muted')}
+                aria-label={item.indicator.label}
+            >
+                <span
+                    className={classNames('w-1.5 h-1.5 rounded-full animate-pulse', toneClass[item.indicator.tone])}
+                    aria-hidden
+                />
+            </span>
+        )}
         {!collapsed && item.external && (
             <FontAwesomeIcon icon={faExternalLinkAlt} className={'!w-3 !h-3 text-body-faint'} />
         )}

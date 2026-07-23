@@ -4,6 +4,7 @@ export type ServerStatus =
     | 'reinstall_failed'
     | 'suspended'
     | 'restoring_backup'
+    | 'switching_game'
     | null;
 
 export interface ServerBackup {

@@ -22,6 +22,8 @@ class ServerStateConflictException extends ConflictHttpException
             $message = 'This server has not yet completed its installation process, please try again later.';
         } elseif ($server->status === Server::STATUS_RESTORING_BACKUP) {
             $message = 'This server is currently restoring from a backup, please try again later.';
+        } elseif ($server->status === Server::STATUS_SWITCHING_GAME) {
+            $message = 'This server is currently switching between game slots, please try again once the switch has completed.';
         } elseif (!is_null($server->transfer)) {
             $message = 'This server is currently being transferred to a new machine, please try again later.';
         }

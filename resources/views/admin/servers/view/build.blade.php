@@ -119,6 +119,13 @@
                                     </div>
                                     <p class="text-muted small">The total number of backups that can be created for this server.</p>
                                 </div>
+                                <div class="form-group col-xs-6">
+                                    <label for="game_slot_limit" class="control-label">Game Slot Limit</label>
+                                    <div>
+                                        <input type="text" name="game_slot_limit" class="form-control" value="{{ old('game_slot_limit', $server->game_slot_limit) }}"/>
+                                    </div>
+                                    <p class="text-muted small">How many game slots this server may hold. A value of 1 disables game switching. Only one slot runs at a time; all slots share this server's resources, ports, and disk.</p>
+                                </div>
                             </div>
                         </div>
                     </div>
