@@ -1,0 +1,77 @@
+.sidebar {
+    @apply flex flex-col h-full bg-surface border-r border-line;
+}
+
+.brand {
+    @apply flex items-center gap-3 h-14 px-4 shrink-0 no-underline;
+}
+
+.brand_mark {
+    @apply flex items-center justify-center w-8 h-8 rounded-md text-white font-header font-semibold text-base shrink-0;
+    background-image: var(--gradient-brand);
+}
+
+.brand_name {
+    @apply font-header font-semibold text-base text-body truncate;
+}
+
+.section_title {
+    @apply px-5 pt-4 pb-1 text-2xs font-semibold uppercase tracking-wider text-body-faint select-none;
+}
+
+.section_rule {
+    @apply mx-4 mt-4 mb-1 border-t border-line;
+}
+
+.item {
+    @apply relative flex items-center gap-3 h-9 mx-2 px-2.5 rounded-md no-underline;
+    @apply text-sm text-body-muted transition-colors duration-150;
+
+    & svg {
+        @apply w-4 h-4 shrink-0;
+    }
+
+    &:hover {
+        @apply text-body bg-surface-hover;
+    }
+
+    & .label {
+        @apply truncate min-w-0 flex-1;
+    }
+}
+
+.item.active {
+    @apply text-body font-medium;
+    background: var(--gradient-brand-soft);
+
+    &::before {
+        content: '';
+        @apply absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-full;
+        background-image: var(--gradient-brand);
+    }
+}
+
+.item.danger {
+    &:hover {
+        @apply text-danger-text;
+        background: rgb(var(--color-danger) / 0.08);
+    }
+}
+
+.collapsed {
+    & .item {
+        @apply justify-center px-0;
+    }
+
+    & .brand {
+        @apply justify-center px-0;
+    }
+}
+
+.footer {
+    @apply mt-auto shrink-0 border-t border-line py-2;
+}
+
+.status_dot {
+    @apply inline-block w-2 h-2 rounded-full shrink-0;
+}

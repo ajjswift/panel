@@ -6,19 +6,13 @@ export interface Props {
     hasError?: boolean;
 }
 
-const light = css<Props>`
-    ${tw`bg-white border-neutral-200 text-neutral-800`};
-    &:focus {
-        ${tw`border-primary-400`}
-    }
-
-    &:disabled {
-        ${tw`bg-neutral-100 border-neutral-200`};
-    }
-`;
+// Retained for API compatibility: inputs are now theme-aware through the
+// design tokens, so the legacy "light" variant no longer applies overrides.
+const light = css<Props>``;
 
 const checkboxStyle = css<Props>`
-    ${tw`bg-neutral-500 cursor-pointer appearance-none inline-block align-middle select-none flex-shrink-0 w-4 h-4 text-primary-400 border border-neutral-300 rounded-sm`};
+    ${tw`bg-neutral-600 cursor-pointer appearance-none inline-block align-middle select-none flex-shrink-0 w-4 h-4 text-primary-600 border border-neutral-400 rounded-sm`};
+    border-radius: 0.25rem;
     color-adjust: exact;
     background-origin: border-box;
     transition: all 75ms linear, box-shadow 25ms linear;
@@ -31,8 +25,8 @@ const checkboxStyle = css<Props>`
     }
 
     &:focus {
-        ${tw`outline-none border-primary-300`};
-        box-shadow: 0 0 0 1px rgba(9, 103, 210, 0.25);
+        ${tw`outline-none border-primary-400`};
+        box-shadow: 0 0 0 2px rgb(var(--color-focus-ring) / 0.35);
     }
 `;
 
@@ -40,12 +34,16 @@ const inputStyle = css<Props>`
     // Reset to normal styling.
     resize: none;
     ${tw`appearance-none outline-none w-full min-w-0`};
-    ${tw`p-3 border-2 rounded text-sm transition-all duration-150`};
-    ${tw`bg-neutral-600 border-neutral-500 hover:border-neutral-400 text-neutral-200 shadow-none focus:ring-0`};
+    ${tw`p-3 border rounded-md text-sm transition-all duration-150`};
+    ${tw`bg-neutral-600 border-neutral-500 hover:border-neutral-400 text-neutral-100 shadow-none focus:ring-0`};
+
+    &::placeholder {
+        ${tw`text-neutral-300`};
+    }
 
     & + .input-help {
         ${tw`mt-1 text-xs`};
-        ${(props) => (props.hasError ? tw`text-red-200` : tw`text-neutral-200`)};
+        ${(props) => (props.hasError ? tw`text-danger-text` : tw`text-neutral-300`)};
     }
 
     &:required,
@@ -54,8 +52,14 @@ const inputStyle = css<Props>`
     }
 
     &:not(:disabled):not(:read-only):focus {
-        ${tw`shadow-md border-primary-300 ring-2 ring-primary-400 ring-opacity-50`};
-        ${(props) => props.hasError && tw`border-red-300 ring-red-200`};
+        ${tw`border-primary-400`};
+        box-shadow: 0 0 0 2px rgb(var(--color-focus-ring) / 0.35);
+        ${(props) => props.hasError && tw`border-danger`};
+        ${(props) =>
+            props.hasError &&
+            css`
+                box-shadow: 0 0 0 2px rgb(var(--color-danger) / 0.3);
+            `};
     }
 
     &:disabled {
@@ -63,7 +67,7 @@ const inputStyle = css<Props>`
     }
 
     ${(props) => props.isLight && light};
-    ${(props) => props.hasError && tw`text-red-100 border-red-400 hover:border-red-300`};
+    ${(props) => props.hasError && tw`text-danger-text border-danger hover:border-danger`};
 `;
 
 const Input = styled.input<Props>`

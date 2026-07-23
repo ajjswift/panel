@@ -4,10 +4,9 @@ import { SocketEvent } from '@/components/server/events';
 import useWebsocketEvent from '@/plugins/useWebsocketEvent';
 import { Line } from 'react-chartjs-2';
 import { useChart, useChartTickLabel } from '@/components/server/console/chart';
-import { hexToRgba } from '@/lib/helpers';
+import { themeToken } from '@/lib/theme';
 import { bytesToString } from '@/lib/formatters';
 import { CloudDownloadIcon, CloudUploadIcon } from '@heroicons/react/solid';
-import { theme } from 'twin.macro';
 import ChartBlock from '@/components/server/console/ChartBlock';
 import Tooltip from '@/components/elements/tooltip/Tooltip';
 
@@ -35,8 +34,8 @@ export default () => {
             return {
                 ...opts,
                 label: !index ? 'Network In' : 'Network Out',
-                borderColor: !index ? theme('colors.cyan.400') : theme('colors.yellow.400'),
-                backgroundColor: hexToRgba(!index ? theme('colors.cyan.700') : theme('colors.yellow.700'), 0.5),
+                borderColor: () => themeToken(!index ? '--accent-500' : '--brand-500'),
+                backgroundColor: () => themeToken(!index ? '--accent-500' : '--brand-500', 0.24),
             };
         },
     });
@@ -79,10 +78,10 @@ export default () => {
                 legend={
                     <>
                         <Tooltip arrow content={'Inbound'}>
-                            <CloudDownloadIcon className={'mr-2 w-4 h-4 text-yellow-400'} />
+                            <CloudDownloadIcon className={'mr-2 w-4 h-4 text-cyan-500'} />
                         </Tooltip>
                         <Tooltip arrow content={'Outbound'}>
-                            <CloudUploadIcon className={'w-4 h-4 text-cyan-400'} />
+                            <CloudUploadIcon className={'w-4 h-4 text-primary-400'} />
                         </Tooltip>
                     </>
                 }

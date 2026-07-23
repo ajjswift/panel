@@ -1,5 +1,5 @@
 .stat_block {
-    @apply flex items-center rounded shadow-lg relative;
+    @apply flex items-center rounded-lg border border-line shadow-sm relative overflow-hidden;
     @apply col-span-3 md:col-span-2 lg:col-span-6;
     @apply px-3 py-2 md:p-3 lg:p-4;
 
@@ -31,7 +31,7 @@
     }
 
     & > .container {
-        @apply rounded-t p-1 sm:p-2 bg-black min-h-[16rem] flex-1 font-mono text-sm;
+        @apply rounded-t-lg p-1 sm:p-2 bg-black min-h-[16rem] flex-1 font-mono text-sm;
 
         & #terminal {
             @apply h-full;
@@ -51,13 +51,19 @@
     }
 
     & .command_input {
-        @apply relative bg-gray-900 px-2 text-gray-100 pl-10 pr-4 py-2 w-full font-mono text-sm sm:rounded-b;
+        /* The terminal stays dark in both themes, so the command input uses
+         * fixed dark colors rather than theme-aware ones. */
+        @apply relative bg-[#060a1c] px-2 text-[#e2e6f2] pl-10 pr-4 py-2 w-full font-mono text-sm sm:rounded-b;
         @apply focus:ring-0 outline-none focus-visible:outline-none;
         @apply border-0 border-b-2 border-transparent transition-colors duration-100;
         @apply active:border-cyan-500 focus:border-cyan-500;
+
+        &::placeholder {
+            @apply text-[#6c769c];
+        }
     }
 }
 
 .chart_container {
-    @apply bg-gray-600 rounded shadow-lg pt-2 border-b-4 border-gray-700 relative;
+    @apply bg-gray-700 border border-line rounded-lg shadow-sm pt-2 relative overflow-hidden;
 }

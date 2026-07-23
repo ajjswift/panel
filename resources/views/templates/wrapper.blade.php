@@ -3,6 +3,22 @@
     <head>
         <title>{{ config('app.name', 'Pterodactyl') }}</title>
 
+        {{-- Apply the persisted theme before first paint to avoid a flash of the wrong theme. --}}
+        <script>
+            (function () {
+                try {
+                    var mode = localStorage.getItem('pterodactyl:theme') || 'system';
+                    var dark = mode === 'dark' || (mode !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+                    var root = document.documentElement;
+                    root.setAttribute('data-theme', dark ? 'dark' : 'light');
+                    root.classList.toggle('dark', dark);
+                    root.style.colorScheme = dark ? 'dark' : 'light';
+                } catch (e) {
+                    document.documentElement.setAttribute('data-theme', 'dark');
+                }
+            })();
+        </script>
+
         @section('meta')
             <meta charset="utf-8">
             <meta http-equiv="X-UA-Compatible" content="IE=edge">

@@ -3,9 +3,11 @@ import CodeMirror from 'codemirror';
 import styled from 'styled-components/macro';
 import tw from 'twin.macro';
 import modes from '@/modes';
+import { resolveTheme, useTheme } from '@/lib/theme';
 
 require('codemirror/lib/codemirror.css');
 require('codemirror/theme/ayu-mirage.css');
+require('codemirror/theme/neo.css');
 require('codemirror/addon/edit/closebrackets');
 require('codemirror/addon/edit/closetag');
 require('codemirror/addon/edit/matchbrackets');
@@ -155,13 +157,14 @@ export default ({
     onContentChanged,
 }: Props) => {
     const [editor, setEditor] = useState<CodeMirror.Editor>();
+    const { resolved: resolvedTheme } = useTheme();
 
     const ref = useCallback((node) => {
         if (!node) return;
 
         const e = CodeMirror.fromTextArea(node, {
             mode: 'text/plain',
-            theme: 'ayu-mirage',
+            theme: resolveTheme() === 'dark' ? 'ayu-mirage' : 'neo',
             indentUnit: 4,
             smartIndent: true,
             tabSize: 4,
@@ -199,6 +202,10 @@ export default ({
     useEffect(() => {
         editor && editor.setOption('mode', mode);
     }, [editor, mode]);
+
+    useEffect(() => {
+        editor && editor.setOption('theme', resolvedTheme === 'dark' ? 'ayu-mirage' : 'neo');
+    }, [editor, resolvedTheme]);
 
     useEffect(() => {
         if (editor) {

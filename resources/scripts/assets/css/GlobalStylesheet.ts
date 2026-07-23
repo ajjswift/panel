@@ -14,24 +14,42 @@ export default createGlobalStyle`
     }
 
     body {
-        ${tw`font-sans bg-neutral-800 text-neutral-200`};
+        ${tw`font-sans`};
+        background-color: rgb(var(--color-background));
+        color: rgb(var(--color-text));
         letter-spacing: 0.015em;
+        transition: background-color 150ms linear;
     }
 
     h1, h2, h3, h4, h5, h6 {
         ${tw`font-medium tracking-normal font-header`};
+        color: rgb(var(--gray-50));
     }
 
     p {
-        ${tw`text-neutral-200 leading-snug font-sans`};
+        ${tw`leading-snug font-sans`};
+        color: rgb(var(--color-text));
+    }
+
+    ::selection {
+        background: rgb(var(--brand-500) / 0.35);
     }
 
     form {
         ${tw`m-0`};
     }
 
-    textarea, select, input, button, button:focus, button:focus-visible {
+    textarea, select, input, button {
         ${tw`outline-none`};
+    }
+
+    /* Highly visible, consistent keyboard focus indicator in both themes. */
+    a:focus-visible,
+    button:focus-visible,
+    [role='button']:focus-visible,
+    [tabindex]:focus-visible {
+        outline: 2px solid rgb(var(--color-focus-ring));
+        outline-offset: 2px;
     }
 
     input[type=number]::-webkit-outer-spin-button,
@@ -47,28 +65,23 @@ export default createGlobalStyle`
     /* Scroll Bar Style */
     ::-webkit-scrollbar {
         background: none;
-        width: 16px;
-        height: 16px;
+        width: 14px;
+        height: 14px;
     }
 
     ::-webkit-scrollbar-thumb {
-        border: solid 0 rgb(0 0 0 / 0%);
-        border-right-width: 4px;
-        border-left-width: 4px;
-        -webkit-border-radius: 9px 4px;
-        -webkit-box-shadow: inset 0 0 0 1px hsl(211, 10%, 53%), inset 0 0 0 4px hsl(209deg 18% 30%);
+        border: 4px solid transparent;
+        background-clip: padding-box;
+        border-radius: 9999px;
+        background-color: rgb(var(--color-border-strong));
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+        background-color: rgb(var(--color-text-faint));
     }
 
     ::-webkit-scrollbar-track-piece {
         margin: 4px 0;
-    }
-
-    ::-webkit-scrollbar-thumb:horizontal {
-        border-right-width: 0;
-        border-left-width: 0;
-        border-top-width: 4px;
-        border-bottom-width: 4px;
-        -webkit-border-radius: 4px 9px;
     }
 
     ::-webkit-scrollbar-corner {

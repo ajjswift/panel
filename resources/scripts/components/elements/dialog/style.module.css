@@ -3,8 +3,8 @@
 }
 
 .panel {
-    @apply relative bg-gray-600 rounded max-w-xl w-full mx-auto shadow-lg text-left;
-    @apply ring-4 ring-gray-800 ring-opacity-80;
+    @apply relative bg-surface rounded-lg max-w-xl w-full mx-auto shadow-lg text-left;
+    @apply border border-line;
 }
 
 .title {
@@ -19,18 +19,18 @@
     @apply flex items-center justify-center w-10 h-10 rounded-full mr-4;
 
     &.danger {
-        @apply bg-red-500 text-red-50;
+        @apply bg-red-600 text-white;
     }
 
     &.warning {
-        @apply bg-yellow-600 text-yellow-50;
+        @apply bg-yellow-600 text-white;
     }
 
     &.success {
-        @apply bg-green-600 text-green-50;
+        @apply bg-green-600 text-white;
     }
 
     &.info {
-        @apply bg-primary-500 text-primary-50;
+        @apply bg-primary-600 text-white;
     }
 }

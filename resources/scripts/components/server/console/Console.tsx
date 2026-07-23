@@ -222,7 +222,7 @@ export default () => {
                     />
                     <div
                         className={classNames(
-                            'text-gray-100 peer-focus:text-gray-50 peer-focus:animate-pulse',
+                            'text-[#a8b0c3] peer-focus:text-[#f7f8fc] peer-focus:animate-pulse',
                             styles.command_icon
                         )}
                     >

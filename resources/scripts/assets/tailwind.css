@@ -1,3 +1,176 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/*
+ * Solstice theme — design tokens.
+ *
+ * Every color is an RGB triplet consumed by tailwind.config.js through
+ * rgb(var(--x) / <alpha-value>), so utility opacity modifiers keep working.
+ *
+ * The gray ramp is *semantic*: shade numbers describe chrome depth and text
+ * emphasis (900 = deepest chrome … 50 = highest-emphasis text). The ramp is
+ * navy-dark in the dark theme and inverts to a soft neutral ramp in the light
+ * theme, which is what makes the existing utility classes theme-aware.
+ *
+ * The active theme is applied as data-theme="light|dark" (plus a matching
+ * `dark` class) on <html> by an inline bootstrap script in the Blade layouts
+ * before first paint, so there is no flash of the wrong theme.
+ */
+@layer base {
+    :root {
+        /* Shape */
+        --radius-sm: 0.375rem;
+        --radius-md: 0.5rem;
+        --radius-lg: 0.75rem;
+
+        /* Brand gradient (orange → purple), used sparingly as an accent. */
+        --gradient-from: #ff8a3d;
+        --gradient-to: #a855f7;
+        --gradient-brand: linear-gradient(135deg, var(--gradient-from) 0%, var(--gradient-to) 100%);
+        --gradient-brand-soft: linear-gradient(135deg, rgb(255 138 61 / 0.16) 0%, rgb(168 85 247 / 0.16) 100%);
+
+        /* Brand purple ramp (shared by primary/blue/purple utilities). */
+        --brand-50: 250 245 255;
+        --brand-100: 243 232 255;
+        --brand-200: 233 213 255;
+        --brand-300: 216 180 254;
+        --brand-400: 192 132 252;
+        --brand-500: 168 85 247;
+        --brand-600: 147 51 234;
+        --brand-700: 126 34 206;
+        --brand-800: 107 33 168;
+        --brand-900: 88 28 135;
+
+        /* Accent orange ramp (shared by cyan/accent utilities). */
+        --accent-50: 255 247 240;
+        --accent-100: 255 237 221;
+        --accent-200: 255 217 184;
+        --accent-300: 255 192 138;
+        --accent-400: 255 176 102;
+        --accent-500: 255 138 61;
+        --accent-600: 233 115 23;
+        --accent-700: 194 90 15;
+        --accent-800: 154 71 14;
+        --accent-900: 124 57 14;
+    }
+
+    /* ------------------------------------------------------------------ *
+     * Dark theme (default)                                               *
+     * ------------------------------------------------------------------ */
+    :root,
+    :root[data-theme='dark'] {
+        color-scheme: dark;
+
+        --gray-900: 9 14 33;      /* deepest chrome (#090e21) */
+        --gray-800: 13 19 43;     /* page background (#0d132b) */
+        --gray-700: 22 30 61;     /* cards / surfaces (#161e3d) */
+        --gray-600: 32 41 76;     /* elevated surfaces, inputs (#20294c) */
+        --gray-500: 54 64 105;    /* borders, subdued controls (#364069) */
+        --gray-400: 108 118 156;  /* strong borders, disabled text (#6c769c) */
+        --gray-300: 168 176 195;  /* muted text (#a8b0c3) */
+        --gray-200: 226 230 242;  /* body text (#e2e6f2) */
+        --gray-100: 240 242 250;  /* high-emphasis text (#f0f2fa) */
+        --gray-50: 247 248 252;   /* headings (#f7f8fc) */
+
+        --color-background: var(--gray-800);
+        --color-surface: var(--gray-700);
+        --color-surface-elevated: var(--gray-600);
+        --color-surface-hover: 28 38 74;
+        --color-text: var(--gray-100);
+        --color-text-muted: var(--gray-300);
+        --color-text-faint: var(--gray-400);
+        --color-border: 42 52 92;
+        --color-border-strong: 64 76 122;
+        --color-primary: var(--brand-500);
+        --color-primary-hover: var(--brand-400);
+        --color-secondary: var(--accent-500);
+        --color-danger: 217 45 32;
+        --color-danger-hover: 240 68 56;
+        --color-danger-text: 249 112 102;
+        --color-success: 22 163 74;
+        --color-success-text: 74 222 128;
+        --color-warning: 217 119 6;
+        --color-warning-text: 253 176 34;
+        --color-focus-ring: var(--brand-400);
+
+        --select-arrow: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3e%3cpath fill='%23a8b0c3' d='M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z'/%3e%3c/svg%3e");
+
+        --shadow-sm: 0 1px 2px 0 rgb(3 6 18 / 0.4);
+        --shadow-md: 0 3px 8px -1px rgb(3 6 18 / 0.45), 0 1px 3px rgb(3 6 18 / 0.35);
+        --shadow-lg: 0 12px 28px -6px rgb(3 6 18 / 0.55), 0 4px 10px -4px rgb(3 6 18 / 0.4);
+    }
+
+    /* ------------------------------------------------------------------ *
+     * Light theme                                                        *
+     * ------------------------------------------------------------------ */
+    :root[data-theme='light'] {
+        color-scheme: light;
+
+        --gray-900: 238 240 247;  /* deepest chrome (#eef0f7) */
+        --gray-800: 246 247 251;  /* page background (#f6f7fb) */
+        --gray-700: 255 255 255;  /* cards / surfaces (#ffffff) */
+        --gray-600: 252 252 254;  /* elevated surfaces, inputs (#fcfcfe) */
+        --gray-500: 213 217 230;  /* borders, subdued controls (#d5d9e6) */
+        --gray-400: 152 160 184;  /* strong borders, disabled text (#98a0b8) */
+        --gray-300: 102 112 133;  /* muted text (#667085) */
+        --gray-200: 42 53 80;     /* body text (#2a3550) */
+        --gray-100: 30 40 64;     /* high-emphasis text (#1e2840) */
+        --gray-50: 23 32 51;      /* headings (#172033) */
+
+        --color-background: var(--gray-800);
+        --color-surface: 255 255 255;
+        --color-surface-elevated: 255 255 255;
+        --color-surface-hover: 249 250 253;
+        --color-text: 23 32 51;
+        --color-text-muted: 102 112 133;
+        --color-text-faint: 152 160 184;
+        --color-border: 228 231 240;
+        --color-border-strong: 205 210 226;
+        --color-primary: var(--brand-600);
+        --color-primary-hover: var(--brand-500);
+        --color-secondary: var(--accent-600);
+        --color-danger: 217 45 32;
+        --color-danger-hover: 180 35 24;
+        --color-danger-text: 180 35 24;
+        --color-success: 21 128 61;
+        --color-success-text: 20 108 67;
+        --color-warning: 181 71 8;
+        --color-warning-text: 148 64 4;
+        --color-focus-ring: var(--brand-500);
+
+        --select-arrow: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3e%3cpath fill='%23667085' d='M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z'/%3e%3c/svg%3e");
+
+        --shadow-sm: 0 1px 2px 0 rgb(23 32 51 / 0.06);
+        --shadow-md: 0 3px 8px -1px rgb(23 32 51 / 0.08), 0 1px 3px rgb(23 32 51 / 0.06);
+        --shadow-lg: 0 12px 28px -6px rgb(23 32 51 / 0.14), 0 4px 10px -4px rgb(23 32 51 / 0.08);
+    }
+
+    /* Quick, functional motion; nothing showy. */
+    @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.01ms !important;
+            scroll-behavior: auto !important;
+        }
+    }
+}
+
+@layer components {
+    /* Thin brand-gradient border for featured/active cards, implemented with
+     * a padding-box/border-box layer stack so content stays readable. */
+    .gradient-border {
+        border: 1px solid transparent;
+        background:
+            linear-gradient(rgb(var(--color-surface)), rgb(var(--color-surface))) padding-box,
+            var(--gradient-brand) border-box;
+    }
+
+    /* 2px underline/edge used for active navigation indicators. */
+    .gradient-edge {
+        background-image: var(--gradient-brand);
+    }
+}

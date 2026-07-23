@@ -1,0 +1,237 @@
+/*
+ * Solstice admin re-skin.
+ *
+ * Loaded after AdminLTE's skin-blue and css/pterodactyl.css to bring the
+ * (Blade-based) administrative area in line with the client-area design
+ * system: deep navy chrome, purple primary actions, an orange→purple
+ * gradient signature accent, and soft neutral surfaces.
+ */
+:root {
+    --sol-orange: #ff8a3d;
+    --sol-purple: #a855f7;
+    --sol-purple-deep: #9333ea;
+    --sol-navy: #101a3a;
+    --sol-navy-deep: #090e21;
+    --sol-bg: #f6f7fb;
+    --sol-surface: #ffffff;
+    --sol-text: #172033;
+    --sol-muted: #667085;
+    --sol-border: #e4e7f0;
+    --sol-gradient: linear-gradient(135deg, #ff8a3d 0%, #a855f7 100%);
+}
+
+/* ---------------------------------------------------------------- page */
+body,
+.content-wrapper {
+    background-color: var(--sol-bg) !important;
+    color: var(--sol-text);
+}
+
+.content-header > h1 {
+    color: var(--sol-text);
+}
+
+.content-header > h1 > small {
+    color: var(--sol-muted);
+}
+
+a {
+    color: var(--sol-purple-deep);
+}
+
+a:hover,
+a:focus {
+    color: var(--sol-purple);
+}
+
+/* -------------------------------------------------------------- header */
+.skin-blue .main-header .navbar,
+.skin-blue .main-header .logo,
+.skin-blue .main-header .logo:hover {
+    background-color: var(--sol-navy-deep);
+}
+
+.skin-blue .main-header .navbar {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.skin-blue .main-header .navbar .sidebar-toggle:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+}
+
+/* ------------------------------------------------------------- sidebar */
+.skin-blue .wrapper,
+.skin-blue .main-sidebar,
+.skin-blue .left-side {
+    background-color: var(--sol-navy);
+}
+
+.skin-blue .sidebar-menu > li.header {
+    background: transparent;
+    color: #8b93ad;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 11px;
+}
+
+.skin-blue .sidebar-menu > li > a {
+    border-left: 2px solid transparent;
+    color: #c6ccdf;
+}
+
+.skin-blue .sidebar-menu > li:hover > a,
+.skin-blue .sidebar-menu > li.active > a {
+    color: #ffffff;
+    background-color: rgba(255, 255, 255, 0.05);
+    border-left: 2px solid transparent;
+    border-image: var(--sol-gradient) 1;
+}
+
+/* ---------------------------------------------------------------- boxes */
+.box {
+    border-radius: 10px;
+    border: 1px solid var(--sol-border);
+    border-top: 1px solid var(--sol-border);
+    box-shadow: 0 1px 2px rgba(23, 32, 51, 0.06);
+    background-color: var(--sol-surface);
+}
+
+.box.box-primary {
+    border-top-color: var(--sol-purple);
+}
+
+.box.box-info {
+    border-top-color: var(--sol-orange);
+}
+
+.box-header {
+    background-color: transparent !important;
+    color: var(--sol-text) !important;
+    border-top-left-radius: 10px;
+    border-top-right-radius: 10px;
+}
+
+.box-header .box-title,
+.box-header > h3 {
+    color: inherit;
+}
+
+.box-header.with-border {
+    border-bottom: 1px solid var(--sol-border);
+}
+
+/* -------------------------------------------------------------- buttons */
+.btn {
+    border-radius: 8px;
+}
+
+.btn-primary,
+.btn-primary:visited {
+    background-color: var(--sol-purple-deep) !important;
+    border-color: var(--sol-purple-deep) !important;
+    color: #fff;
+}
+
+.btn.btn-primary:hover,
+.btn.btn-primary:focus,
+.btn.btn-primary:active {
+    background-color: var(--sol-purple) !important;
+    border-color: var(--sol-purple) !important;
+}
+
+.btn-info {
+    background-color: var(--sol-navy);
+    border-color: var(--sol-navy);
+}
+
+.btn-info:hover,
+.btn-info:focus {
+    background-color: #1b2a5c;
+    border-color: #1b2a5c;
+}
+
+.btn-success {
+    background-color: #16a34a;
+    border-color: #15803d;
+}
+
+.btn-danger {
+    background-color: #d92d20;
+    border-color: #b42318;
+}
+
+/* ------------------------------------------------------- forms & inputs */
+.form-control {
+    border-radius: 8px;
+    border-color: #d5d9e6;
+    color: var(--sol-text);
+}
+
+.form-control:focus {
+    border-color: var(--sol-purple);
+    box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.25);
+}
+
+label {
+    color: var(--sol-text);
+}
+
+.help-block {
+    color: var(--sol-muted);
+}
+
+/* --------------------------------------------------------------- tables */
+.table > thead > tr > th {
+    color: var(--sol-muted);
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid var(--sol-border);
+}
+
+.table > tbody > tr > td {
+    border-top: 1px solid var(--sol-border);
+    vertical-align: middle;
+}
+
+.table-hover > tbody > tr:hover {
+    background-color: #f2f3f9;
+}
+
+/* ------------------------------------------------------- misc branding */
+.pagination > .active > a,
+.pagination > .active > a:hover,
+.pagination > .active > a:focus,
+.pagination > .active > span {
+    background-color: var(--sol-purple-deep);
+    border-color: var(--sol-purple-deep);
+}
+
+.label-primary {
+    background-color: var(--sol-purple-deep);
+}
+
+.label-info {
+    background-color: var(--sol-orange);
+}
+
+.nav-tabs-custom > .nav-tabs > li.active {
+    border-top-color: var(--sol-purple);
+}
+
+.callout.callout-info {
+    background-color: #eef2ff !important;
+    color: var(--sol-navy) !important;
+    border-left-color: var(--sol-purple);
+}
+
+.callout.callout-warning {
+    border-left-color: var(--sol-orange);
+}
+
+/* Progress bars pick up the gradient accent. */
+.progress-bar-aqua,
+.progress-bar-info,
+.progress-bar-primary {
+    background: var(--sol-gradient);
+}

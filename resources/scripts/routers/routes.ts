@@ -1,4 +1,20 @@
 import React, { lazy } from 'react';
+import { IconDefinition } from '@fortawesome/fontawesome-svg-core';
+import {
+    faArchive,
+    faClock,
+    faCog,
+    faDatabase,
+    faFingerprint,
+    faFolderOpen,
+    faKey,
+    faNetworkWired,
+    faRocket,
+    faStream,
+    faTerminal,
+    faUserCircle,
+    faUsers,
+} from '@fortawesome/free-solid-svg-icons';
 import ServerConsole from '@/components/server/console/ServerConsoleContainer';
 import DatabasesContainer from '@/components/server/databases/DatabasesContainer';
 import ScheduleContainer from '@/components/server/schedules/ScheduleContainer';
@@ -29,10 +45,14 @@ interface RouteDefinition {
     name: string | undefined;
     component: React.ComponentType;
     exact?: boolean;
+    // Icon displayed next to the route in the sidebar navigation.
+    icon?: IconDefinition;
 }
 
 interface ServerRouteDefinition extends RouteDefinition {
     permission: string | string[] | null;
+    // Routes flagged as "management" render in the secondary sidebar group.
+    group?: 'management';
 }
 
 interface Routes {
@@ -47,22 +67,26 @@ export default {
         {
             path: '/',
             name: 'Account',
+            icon: faUserCircle,
             component: AccountOverviewContainer,
             exact: true,
         },
         {
             path: '/api',
             name: 'API Credentials',
+            icon: faKey,
             component: AccountApiContainer,
         },
         {
             path: '/ssh',
             name: 'SSH Keys',
+            icon: faFingerprint,
             component: AccountSSHContainer,
         },
         {
             path: '/activity',
             name: 'Activity',
+            icon: faStream,
             component: ActivityLogContainer,
         },
     ],
@@ -71,6 +95,7 @@ export default {
             path: '/',
             permission: null,
             name: 'Console',
+            icon: faTerminal,
             component: ServerConsole,
             exact: true,
         },
@@ -78,6 +103,7 @@ export default {
             path: '/files',
             permission: 'file.*',
             name: 'Files',
+            icon: faFolderOpen,
             component: FileManagerContainer,
         },
         {
@@ -90,12 +116,14 @@ export default {
             path: '/databases',
             permission: 'database.*',
             name: 'Databases',
+            icon: faDatabase,
             component: DatabasesContainer,
         },
         {
             path: '/schedules',
             permission: 'schedule.*',
             name: 'Schedules',
+            icon: faClock,
             component: ScheduleContainer,
         },
         {
@@ -108,36 +136,46 @@ export default {
             path: '/users',
             permission: 'user.*',
             name: 'Users',
+            icon: faUsers,
+            group: 'management',
             component: UsersContainer,
         },
         {
             path: '/backups',
             permission: 'backup.*',
             name: 'Backups',
+            icon: faArchive,
             component: BackupContainer,
         },
         {
             path: '/network',
             permission: 'allocation.*',
             name: 'Network',
+            icon: faNetworkWired,
             component: NetworkContainer,
         },
         {
             path: '/startup',
             permission: 'startup.*',
             name: 'Startup',
+            icon: faRocket,
+            group: 'management',
             component: StartupContainer,
         },
         {
             path: '/settings',
             permission: ['settings.*', 'file.sftp'],
             name: 'Settings',
+            icon: faCog,
+            group: 'management',
             component: SettingsContainer,
         },
         {
             path: '/activity',
             permission: 'activity.*',
             name: 'Activity',
+            icon: faStream,
+            group: 'management',
             component: ServerActivityLogContainer,
         },
     ],
