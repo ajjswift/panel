@@ -15,6 +15,35 @@ class CloudflareDnsProvider implements DnsProvider
     {
     }
 
+    /**
+     * Find the active Cloudflare zone matching the configured parent domain.
+     *
+     * @return array{id: string, name: string}
+     */
+    public function discoverZone(ManagedDomain $domain): array
+    {
+        $domainName = strtolower(rtrim($domain->domain, '.'));
+        $zones = $this->request($domain, 'get', '/zones', [
+            'name' => $domainName,
+            'status' => 'active',
+            'per_page' => 2,
+        ]);
+
+        $zone = collect($zones)->first(function (array $zone) use ($domainName) {
+            return strtolower(rtrim((string) ($zone['name'] ?? ''), '.')) === $domainName
+                && ($zone['status'] ?? null) === 'active';
+        });
+
+        if (!$zone || !is_string($zone['id'] ?? null) || !preg_match('/^[a-f0-9]{32}$/i', $zone['id'])) {
+            throw new DnsProviderException('provider_zone_not_found', 'No active Cloudflare zone matching that domain was found. Check the domain and token zone permissions.');
+        }
+
+        return [
+            'id' => $zone['id'],
+            'name' => strtolower(rtrim((string) $zone['name'], '.')),
+        ];
+    }
+
     public function validateConfiguration(ManagedDomain $domain, bool $testWriteAccess = false): array
     {
         $zone = $this->request($domain, 'get', "/zones/{$domain->zone_id}");

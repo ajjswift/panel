@@ -34,16 +34,31 @@
     </div>
 
     <div class="col-md-7">
-        <form action="{{ route('admin.managed-dns.store') }}" method="POST">
+        <form id="managedDomainCreateForm" action="{{ route('admin.managed-dns.store') }}" method="POST">
             @csrf
             <div class="box box-primary">
                 <div class="box-header with-border"><h3 class="box-title">Add Cloudflare parent domain</h3></div>
                 <div class="box-body">
                     <div class="row">
                         <div class="form-group col-md-6"><label>Display name</label><input name="name" class="form-control" required></div>
-                        <div class="form-group col-md-6"><label>Root domain</label><input name="domain" class="form-control" placeholder="example.com" required></div>
-                        <div class="form-group col-md-6"><label>Cloudflare zone ID</label><input name="zone_id" class="form-control" required></div>
-                        <div class="form-group col-md-6"><label>Scoped API token</label><input name="api_token" type="password" autocomplete="new-password" class="form-control" required></div>
+                        <div class="form-group col-md-6"><label>Root domain</label><input id="managedDomainName" name="domain" class="form-control" placeholder="example.com" required></div>
+                        <div class="form-group col-md-6">
+                            <label>Cloudflare zone ID</label>
+                            <div class="input-group">
+                                <input id="managedDomainZoneId" name="zone_id" class="form-control" required>
+                                <span class="input-group-btn">
+                                    <button id="discoverCloudflareZone" type="button" class="btn btn-default">
+                                        <i class="fa fa-cloud"></i> Find zone &amp; verify
+                                    </button>
+                                </span>
+                            </div>
+                        </div>
+                        <div class="form-group col-md-6"><label>Scoped API token</label><input id="managedDomainApiToken" name="api_token" type="password" autocomplete="new-password" class="form-control" required></div>
+                        <div class="col-xs-12">
+                            <p id="cloudflareDiscoveryStatus" class="help-block">
+                                The token needs Zone:Read and DNS:Edit for this zone. Verification briefly creates, updates, and removes a TXT record; it does not create zones or change nameservers.
+                            </p>
+                        </div>
                         <div class="form-group col-md-6"><label>Default TTL</label><input name="ttl" type="number" min="60" value="300" class="form-control" required></div>
                         <div class="form-group col-md-6"><label>Label pattern</label><input name="label_pattern" value="^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$" class="form-control" required></div>
                         <div class="form-group col-xs-12"><label>Reserved labels</label><textarea name="reserved_labels" class="form-control" placeholder="www, mail, api, admin, panel, status"></textarea></div>
@@ -97,4 +112,59 @@
         </div>
     </div>
 </div>
+@endsection
+
+@section('footer-scripts')
+    @parent
+    <script>
+        $(function () {
+            var $button = $('#discoverCloudflareZone');
+            var $status = $('#cloudflareDiscoveryStatus');
+
+            $button.on('click', function () {
+                var domain = $.trim($('#managedDomainName').val());
+                var token = $('#managedDomainApiToken').val();
+
+                if (!domain || !token) {
+                    $status.removeClass('text-success').addClass('text-danger').text('Enter the root domain and scoped API token first.');
+                    return;
+                }
+
+                $button.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Verifying...');
+                $status.removeClass('text-success text-danger').text('Looking up the active Cloudflare zone and checking DNS permissions...');
+
+                $.ajax({
+                    method: 'POST',
+                    url: '{{ route('admin.managed-dns.discover') }}',
+                    data: {
+                        _token: '{{ csrf_token() }}',
+                        domain: domain,
+                        api_token: token
+                    }
+                }).done(function (response) {
+                    $('#managedDomainZoneId').val(response.zone_id);
+                    $status.removeClass('text-danger').addClass('text-success').text(
+                        'Found ' + response.zone_name + ' and verified DNS read, create, update, and delete access.'
+                    );
+                }).fail(function (jqXHR) {
+                    var message = 'Cloudflare configuration could not be verified.';
+
+                    if (jqXHR.responseJSON && jqXHR.responseJSON.message) {
+                        message = jqXHR.responseJSON.message;
+                    } else if (
+                        jqXHR.responseJSON &&
+                        jqXHR.responseJSON.errors &&
+                        jqXHR.responseJSON.errors[0] &&
+                        jqXHR.responseJSON.errors[0].detail
+                    ) {
+                        message = jqXHR.responseJSON.errors[0].detail;
+                    }
+
+                    $status.removeClass('text-success').addClass('text-danger').text(message);
+                }).always(function () {
+                    $button.prop('disabled', false).html('<i class="fa fa-cloud"></i> Find zone &amp; verify');
+                });
+            });
+        });
+    </script>
 @endsection

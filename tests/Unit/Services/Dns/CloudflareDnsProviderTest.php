@@ -10,6 +10,51 @@ use Pterodactyl\Exceptions\Service\Dns\DnsProviderException;
 
 class CloudflareDnsProviderTest extends TestCase
 {
+    public function testItDiscoversAnActiveZoneByExactDomainName(): void
+    {
+        $http = new Factory();
+        $http->preventStrayRequests();
+        $http->fake([
+            '*' => $http->response([
+                'success' => true,
+                'result' => [[
+                    'id' => str_repeat('b', 32),
+                    'name' => 'example.com',
+                    'status' => 'active',
+                ]],
+            ], 200),
+        ]);
+
+        $zone = (new CloudflareDnsProvider($http))->discoverZone($this->domain());
+
+        $this->assertSame(str_repeat('b', 32), $zone['id']);
+        $this->assertSame('example.com', $zone['name']);
+        $http->assertSent(fn ($request) => str_contains($request->url(), '/zones?')
+            && str_contains($request->url(), 'name=example.com')
+            && str_contains($request->url(), 'status=active'));
+    }
+
+    public function testItRejectsAZoneDiscoveryWithoutAnExactActiveMatch(): void
+    {
+        $http = new Factory();
+        $http->preventStrayRequests();
+        $http->fake([
+            '*' => $http->response([
+                'success' => true,
+                'result' => [[
+                    'id' => str_repeat('b', 32),
+                    'name' => 'other.example.com',
+                    'status' => 'active',
+                ]],
+            ], 200),
+        ]);
+
+        $this->expectException(DnsProviderException::class);
+        $this->expectExceptionMessage('No active Cloudflare zone matching that domain was found.');
+
+        (new CloudflareDnsProvider($http))->discoverZone($this->domain());
+    }
+
     public function testSrvPayloadIsUnproxiedAndContainsProtocolFields(): void
     {
         $http = new Factory();

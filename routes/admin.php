@@ -9,6 +9,7 @@ Route::get('/', [Admin\BaseController::class, 'index'])->name('admin.index');
 Route::group(['prefix' => 'managed-dns'], function () {
     Route::get('/', [Admin\Dns\ManagedDomainController::class, 'index'])->name('admin.managed-dns');
     Route::post('/domains', [Admin\Dns\ManagedDomainController::class, 'store'])->name('admin.managed-dns.store');
+    Route::post('/domains/discover', [Admin\Dns\ManagedDomainController::class, 'discover'])->name('admin.managed-dns.discover');
     Route::get('/domains/{managedDomain}', [Admin\Dns\ManagedDomainController::class, 'edit'])->name('admin.managed-dns.edit');
     Route::patch('/domains/{managedDomain}', [Admin\Dns\ManagedDomainController::class, 'update'])->name('admin.managed-dns.update');
     Route::post('/domains/{managedDomain}/test', [Admin\Dns\ManagedDomainController::class, 'test'])->name('admin.managed-dns.test');
