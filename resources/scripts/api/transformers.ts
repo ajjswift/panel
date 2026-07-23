@@ -10,6 +10,7 @@ export const rawDataToServerAllocation = (data: FractalResponseData): Allocation
     port: data.attributes.port,
     notes: data.attributes.notes,
     isDefault: data.attributes.is_default,
+    managedHostnameCount: data.attributes.managed_hostname_count || 0,
 });
 
 export const rawDataToFileObject = (data: FractalResponseData): FileObject => ({

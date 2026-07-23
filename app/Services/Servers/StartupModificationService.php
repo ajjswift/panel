@@ -9,6 +9,7 @@ use Pterodactyl\Models\Server;
 use Pterodactyl\Models\ServerVariable;
 use Illuminate\Database\ConnectionInterface;
 use Pterodactyl\Traits\Services\HasUserLevels;
+use Pterodactyl\Jobs\Dns\ReconcileServerManagedDnsJob;
 
 class StartupModificationService
 {
@@ -28,7 +29,8 @@ class StartupModificationService
      */
     public function handle(Server $server, array $data): Server
     {
-        return $this->connection->transaction(function () use ($server, $data) {
+        $originalEggId = $server->egg_id;
+        $updated = $this->connection->transaction(function () use ($server, $data) {
             if (!empty($data['environment'])) {
                 $egg = $this->isUserLevel(User::USER_LEVEL_ADMIN) ? ($data['egg_id'] ?? $server->egg_id) : $server->egg_id;
 
@@ -60,6 +62,12 @@ class StartupModificationService
             //  that should be looked into more.
             return $server->fresh();
         });
+
+        if ($updated->egg_id !== $originalEggId) {
+            ReconcileServerManagedDnsJob::dispatch($updated->id);
+        }
+
+        return $updated;
     }
 
     /**

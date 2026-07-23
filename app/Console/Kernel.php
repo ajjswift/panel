@@ -10,6 +10,7 @@ use Pterodactyl\Repositories\Eloquent\SettingsRepository;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
 use Pterodactyl\Services\Telemetry\TelemetryCollectionService;
 use Pterodactyl\Console\Commands\Schedule\ProcessRunnableCommand;
+use Pterodactyl\Console\Commands\Maintenance\ReconcileManagedDnsCommand;
 use Pterodactyl\Console\Commands\Maintenance\PruneOrphanedBackupsCommand;
 use Pterodactyl\Console\Commands\Maintenance\CleanServiceBackupFilesCommand;
 
@@ -38,6 +39,13 @@ class Kernel extends ConsoleKernel
         if (config('backups.prune_age')) {
             // Every 30 minutes, run the backup pruning command so that any abandoned backups can be deleted.
             $schedule->command(PruneOrphanedBackupsCommand::class)->everyThirtyMinutes();
+        }
+
+        if (config('managed-dns.enabled') && config('managed-dns.reconcile_interval_minutes') > 0) {
+            $managedDnsInterval = max(1, min(59, (int) config('managed-dns.reconcile_interval_minutes')));
+            $schedule->command(ReconcileManagedDnsCommand::class)
+                ->cron("*/{$managedDnsInterval} * * * *")
+                ->withoutOverlapping();
         }
 
         if (config('activity.prune_days')) {

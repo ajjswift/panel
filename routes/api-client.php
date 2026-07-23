@@ -118,6 +118,20 @@ Route::group([
         Route::post('/allocations/{allocation}', [Client\Servers\NetworkAllocationController::class, 'update']);
         Route::post('/allocations/{allocation}/primary', [Client\Servers\NetworkAllocationController::class, 'setPrimary']);
         Route::delete('/allocations/{allocation}', [Client\Servers\NetworkAllocationController::class, 'delete']);
+
+        Route::get('/overview', [Client\Servers\ManagedSubdomainController::class, 'overview']);
+        Route::get('/subdomains', [Client\Servers\ManagedSubdomainController::class, 'index']);
+        Route::middleware([ResourceLimit::SubdomainPreview->middleware()])
+            ->post('/subdomains/preview', [Client\Servers\ManagedSubdomainController::class, 'preview']);
+        Route::middleware([ResourceLimit::Subdomain->middleware()])
+            ->post('/subdomains', [Client\Servers\ManagedSubdomainController::class, 'store']);
+        Route::patch('/subdomains/{managedSubdomain}', [Client\Servers\ManagedSubdomainController::class, 'update']);
+        Route::patch('/subdomains/{managedSubdomain}/allocation', [Client\Servers\ManagedSubdomainController::class, 'reassign']);
+        Route::middleware([ResourceLimit::SubdomainRepair->middleware()])
+            ->post('/subdomains/{managedSubdomain}/repair', [Client\Servers\ManagedSubdomainController::class, 'repair']);
+        Route::post('/subdomains/{managedSubdomain}/refresh', [Client\Servers\ManagedSubdomainController::class, 'refresh']);
+        Route::get('/subdomains/{managedSubdomain}/history', [Client\Servers\ManagedSubdomainController::class, 'history']);
+        Route::delete('/subdomains/{managedSubdomain}', [Client\Servers\ManagedSubdomainController::class, 'delete']);
     });
 
     Route::group(['prefix' => '/users'], function () {

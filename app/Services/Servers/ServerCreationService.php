@@ -10,7 +10,10 @@ use Webmozart\Assert\Assert;
 use Pterodactyl\Models\Server;
 use Illuminate\Support\Collection;
 use Pterodactyl\Models\Allocation;
+use Pterodactyl\Enum\SubdomainPolicy;
 use Illuminate\Database\ConnectionInterface;
+use Pterodactyl\Enum\SubdomainCompatibility;
+use Pterodactyl\Exceptions\DisplayException;
 use Pterodactyl\Models\Objects\DeploymentObject;
 use Pterodactyl\Repositories\Eloquent\ServerRepository;
 use Pterodactyl\Repositories\Wings\DaemonServerRepository;
@@ -43,7 +46,7 @@ class ServerCreationService
      * no node_id the node_is will be picked from the allocation.
      *
      * @throws \Throwable
-     * @throws \Pterodactyl\Exceptions\DisplayException
+     * @throws DisplayException
      * @throws \Illuminate\Validation\ValidationException
      * @throws \Pterodactyl\Exceptions\Repository\RecordNotFoundException
      * @throws \Pterodactyl\Exceptions\Service\Deployment\NoViableNodeException
@@ -77,6 +80,28 @@ class ServerCreationService
             ->setUserLevel(User::USER_LEVEL_ADMIN)
             ->handle(Arr::get($data, 'egg_id'), Arr::get($data, 'environment', []));
 
+        $egg = Egg::query()->findOrFail(Arr::get($data, 'egg_id'));
+        if (
+            Arr::get($data, 'subdomain_policy', SubdomainPolicy::Inherit->value) === SubdomainPolicy::Enabled->value
+            && $egg->subdomain_compatibility !== SubdomainCompatibility::Compatible->value
+        ) {
+            throw new DisplayException('Managed subdomains cannot be enabled because the selected egg is marked incompatible.');
+        }
+        if (
+            Arr::get($data, 'subdomain_policy', SubdomainPolicy::Inherit->value) === SubdomainPolicy::Enabled->value
+            && !$egg->subdomain_server_override_allowed
+            && $egg->subdomain_default_policy !== SubdomainPolicy::Enabled->value
+        ) {
+            throw new DisplayException('The selected egg does not allow a server-level managed-subdomain override.');
+        }
+        if (
+            Arr::get($data, 'dns_service_profile_id')
+            && !$egg->subdomain_server_override_allowed
+            && (int) Arr::get($data, 'dns_service_profile_id') !== $egg->dns_service_profile_id
+        ) {
+            throw new DisplayException('The selected egg does not allow a server-level DNS service-profile override.');
+        }
+
         // Due to the design of the Daemon, we need to persist this server to the disk
         // before we can actually create it on the Daemon.
         //
@@ -109,7 +134,7 @@ class ServerCreationService
     /**
      * Gets an allocation to use for automatic deployment.
      *
-     * @throws \Pterodactyl\Exceptions\DisplayException
+     * @throws DisplayException
      * @throws \Pterodactyl\Exceptions\Service\Deployment\NoViableAllocationException
      * @throws \Pterodactyl\Exceptions\Service\Deployment\NoViableNodeException
      */
@@ -162,6 +187,13 @@ class ServerCreationService
             'database_limit' => Arr::get($data, 'database_limit') ?? 0,
             'allocation_limit' => Arr::get($data, 'allocation_limit') ?? 0,
             'backup_limit' => Arr::get($data, 'backup_limit') ?? 0,
+            'game_slot_limit' => max(1, (int) (Arr::get($data, 'game_slot_limit') ?? 1)),
+            'subdomain_policy' => Arr::get($data, 'subdomain_policy') ?? SubdomainPolicy::Inherit->value,
+            'subdomain_limit' => max(0, (int) (Arr::get($data, 'subdomain_limit') ?? 0)),
+            'dns_service_profile_id' => Arr::get($data, 'dns_service_profile_id'),
+            'subdomain_domain_restrictions' => Arr::get($data, 'subdomain_domain_restrictions'),
+            'subdomain_policy_source' => Arr::get($data, 'subdomain_policy_source'),
+            'subdomain_admin_notes' => Arr::get($data, 'subdomain_admin_notes'),
         ]);
 
         return $model;

@@ -21,6 +21,9 @@ enum ResourceLimit
     case Backup;
     case Database;
     case Schedule;
+    case Subdomain;
+    case SubdomainPreview;
+    case SubdomainRepair;
     case Subuser;
     case Websocket;
     case FilePull;
@@ -48,6 +51,8 @@ enum ResourceLimit
             self::FilePull => Limit::perMinutes(10, 5),
             self::Subuser => Limit::perMinutes(15, 10),
             self::Websocket => Limit::perMinute(5),
+            self::SubdomainPreview => Limit::perMinute(10),
+            self::SubdomainRepair => Limit::perMinutes(10, 3),
             default => Limit::perMinute(2),
         };
     }

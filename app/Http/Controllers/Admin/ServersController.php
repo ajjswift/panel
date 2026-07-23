@@ -8,6 +8,7 @@ use Illuminate\Http\Response;
 use Pterodactyl\Models\Mount;
 use Pterodactyl\Models\Server;
 use Pterodactyl\Models\Database;
+use Pterodactyl\Facades\Activity;
 use Pterodactyl\Models\MountServer;
 use Illuminate\Http\RedirectResponse;
 use Prologue\Alerts\AlertsMessageBag;
@@ -142,14 +143,28 @@ class ServersController extends Controller
      */
     public function updateBuild(Request $request, Server $server): RedirectResponse
     {
+        $oldDnsPolicy = $server->only([
+            'subdomain_policy', 'subdomain_limit', 'dns_service_profile_id',
+            'subdomain_domain_restrictions', 'subdomain_policy_source',
+        ]);
         try {
-            $this->buildModificationService->handle($server, $request->only([
+            $updated = $this->buildModificationService->handle($server, $request->only([
                 'allocation_id', 'add_allocations', 'remove_allocations',
                 'memory', 'swap', 'io', 'cpu', 'threads', 'disk',
                 'database_limit', 'allocation_limit', 'backup_limit', 'game_slot_limit', 'oom_disabled',
+                'subdomain_policy', 'subdomain_limit', 'dns_service_profile_id',
+                'subdomain_domain_restrictions', 'subdomain_policy_source', 'subdomain_admin_notes',
             ]));
         } catch (DataValidationException $exception) {
             throw new ValidationException($exception->getValidator());
+        }
+
+        $newDnsPolicy = $updated->only(array_keys($oldDnsPolicy));
+        if ($oldDnsPolicy !== $newDnsPolicy) {
+            Activity::event('admin:server.subdomain-policy.updated')
+                ->subject($updated)
+                ->property(['old' => $oldDnsPolicy, 'new' => $newDnsPolicy])
+                ->log();
         }
 
         $this->alert->success(trans('admin/server.alerts.build_updated'))->flash();

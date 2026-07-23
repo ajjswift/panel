@@ -205,6 +205,28 @@
                 </div>
             </div>
         </div>
+        <div class="col-sm-6">
+            <div class="box">
+                <div class="box-header with-border">
+                    <h3 class="box-title">Managed DNS Public Targets</h3>
+                </div>
+                <div class="box-body row">
+                    <div class="form-group col-xs-12">
+                        <label>Public IPv4 target</label>
+                        <input name="dns_target_ipv4" class="form-control" value="{{ old('dns_target_ipv4', $node->dns_target_ipv4) }}" placeholder="203.0.113.20"/>
+                    </div>
+                    <div class="form-group col-xs-12">
+                        <label>Public IPv6 target</label>
+                        <input name="dns_target_ipv6" class="form-control" value="{{ old('dns_target_ipv6', $node->dns_target_ipv6) }}" placeholder="2001:db8::20"/>
+                    </div>
+                    <div class="form-group col-xs-12">
+                        <label>Public hostname target</label>
+                        <input name="dns_target_hostname" class="form-control" value="{{ old('dns_target_hostname', $node->dns_target_hostname) }}" placeholder="games.example.net"/>
+                        <p class="text-muted small">Used only when an allocation does not expose a safe public address. Private, loopback, wildcard, and bind addresses are rejected.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
         <div class="col-xs-12">
             <div class="box box-primary">
                 <div class="box-header with-border">

@@ -45,6 +45,8 @@ class AppServiceProvider extends ServiceProvider
             'egg_variable' => Models\EggVariable::class,
             'game_slot' => Models\GameSlot::class,
             'game_switch_operation' => Models\GameSwitchOperation::class,
+            'managed_domain' => Models\ManagedDomain::class,
+            'managed_subdomain' => Models\ManagedSubdomain::class,
             'schedule' => Models\Schedule::class,
             'server' => Models\Server::class,
             'ssh_key' => Models\UserSSHKey::class,

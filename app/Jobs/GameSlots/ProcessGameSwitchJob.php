@@ -14,6 +14,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Pterodactyl\Models\GameSwitchOperation;
+use Pterodactyl\Jobs\Dns\ReconcileServerManagedDnsJob;
 use Pterodactyl\Repositories\Wings\DaemonPowerRepository;
 use Pterodactyl\Repositories\Wings\DaemonServerRepository;
 use Pterodactyl\Services\GameSlots\GameSlotStorageService;
@@ -309,6 +310,8 @@ class ProcessGameSwitchJob implements ShouldQueue
             'completed_at' => Carbon::now(),
             'lock_marker' => null,
         ])->save();
+
+        ReconcileServerManagedDnsJob::dispatch($this->server->id);
     }
 
     private function handleFailure(\Throwable $exception): void
@@ -338,6 +341,8 @@ class ProcessGameSwitchJob implements ShouldQueue
                 'lock_marker' => null,
                 'internal_error_context' => $context,
             ])->save();
+
+            ReconcileServerManagedDnsJob::dispatch($this->server->id);
 
             return;
         }

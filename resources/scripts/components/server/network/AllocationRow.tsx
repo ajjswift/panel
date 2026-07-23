@@ -83,6 +83,14 @@ const AllocationRow = ({ allocation }: Props) => {
                     <Code dark>{allocation.port}</Code>
                     <Label>Port</Label>
                 </div>
+                {allocation.managedHostnameCount > 0 && (
+                    <div className={'ml-4 hidden lg:block'}>
+                        <span className={'rounded border border-primary-700 px-2 py-1 text-xs text-primary-200'}>
+                            {allocation.managedHostnameCount} managed hostname
+                            {allocation.managedHostnameCount === 1 ? '' : 's'}
+                        </span>
+                    </div>
+                )}
             </div>
             <div className={'mt-4 w-full md:mt-0 md:flex-1 md:w-auto'}>
                 <InputSpinner visible={loading}>
@@ -102,7 +110,10 @@ const AllocationRow = ({ allocation }: Props) => {
                 ) : (
                     <>
                         <Can action={'allocation.delete'}>
-                            <DeleteAllocationButton allocation={allocation.id} />
+                            <DeleteAllocationButton
+                                allocation={allocation.id}
+                                managedHostnameCount={allocation.managedHostnameCount}
+                            />
                         </Can>
                         <Can action={'allocation.update'}>
                             <Button.Text size={Button.Sizes.Small} onClick={setPrimaryAllocation}>

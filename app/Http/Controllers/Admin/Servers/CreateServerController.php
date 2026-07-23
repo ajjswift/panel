@@ -8,6 +8,8 @@ use Pterodactyl\Models\Node;
 use Pterodactyl\Models\Location;
 use Illuminate\Http\RedirectResponse;
 use Prologue\Alerts\AlertsMessageBag;
+use Pterodactyl\Models\ManagedDomain;
+use Pterodactyl\Models\DnsServiceProfile;
 use Pterodactyl\Http\Controllers\Controller;
 use Pterodactyl\Repositories\Eloquent\NestRepository;
 use Pterodactyl\Repositories\Eloquent\NodeRepository;
@@ -55,6 +57,8 @@ class CreateServerController extends Controller
         return view('admin.servers.new', [
             'locations' => Location::all(),
             'nests' => $nests,
+            'managedDomains' => ManagedDomain::query()->where('enabled', true)->orderBy('domain')->get(),
+            'dnsServiceProfiles' => DnsServiceProfile::query()->where('enabled', true)->orderBy('name')->get(),
         ]);
     }
 

@@ -4,8 +4,10 @@ namespace Pterodactyl\Http\Controllers\Admin\Nests;
 
 use Illuminate\View\View;
 use Pterodactyl\Models\Egg;
+use Pterodactyl\Facades\Activity;
 use Illuminate\Http\RedirectResponse;
 use Prologue\Alerts\AlertsMessageBag;
+use Pterodactyl\Models\DnsServiceProfile;
 use Illuminate\View\Factory as ViewFactory;
 use Pterodactyl\Http\Controllers\Controller;
 use Pterodactyl\Services\Eggs\EggUpdateService;
@@ -73,6 +75,7 @@ class EggController extends Controller
                 array_keys($egg->docker_images),
                 $egg->docker_images,
             ),
+            'dnsServiceProfiles' => DnsServiceProfile::query()->where('enabled', true)->orderBy('name')->get(),
         ]);
     }
 
@@ -85,10 +88,22 @@ class EggController extends Controller
      */
     public function update(EggFormRequest $request, Egg $egg): RedirectResponse
     {
+        $oldDnsPolicy = $egg->only([
+            'subdomain_compatibility', 'subdomain_default_policy',
+            'dns_service_profile_id', 'subdomain_server_override_allowed',
+        ]);
         $data = $request->validated();
         $data['docker_images'] = $this->normalizeDockerImages($data['docker_images'] ?? null);
 
         $this->updateService->handle($egg, $data);
+        $updated = $egg->refresh();
+        $newDnsPolicy = $updated->only(array_keys($oldDnsPolicy));
+        if ($oldDnsPolicy !== $newDnsPolicy) {
+            Activity::event('admin:egg.subdomain-policy.updated')
+                ->subject($updated)
+                ->property(['old' => $oldDnsPolicy, 'new' => $newDnsPolicy])
+                ->log();
+        }
         $this->alert->success(trans('admin/nests.eggs.notices.updated'))->flash();
 
         return redirect()->route('admin.nests.egg.view', $egg->id);

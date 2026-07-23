@@ -144,6 +144,54 @@
         <div class="col-xs-12">
             <div class="box">
                 <div class="box-header with-border">
+                    <h3 class="box-title">DNS and Managed Subdomains</h3>
+                </div>
+                <div class="box-body">
+                    <div class="row">
+                        <div class="form-group col-md-4">
+                            <label>Technical compatibility</label>
+                            <select name="subdomain_compatibility" class="form-control">
+                                <option value="incompatible" @selected($egg->subdomain_compatibility === 'incompatible')>Incompatible</option>
+                                <option value="compatible" @selected($egg->subdomain_compatibility === 'compatible')>Compatible</option>
+                            </select>
+                            <p class="text-muted small">Compatibility is a technical safety decision, independent of customer entitlement.</p>
+                        </div>
+                        <div class="form-group col-md-4">
+                            <label>Default server entitlement</label>
+                            <select name="subdomain_default_policy" class="form-control">
+                                <option value="disabled" @selected($egg->subdomain_default_policy === 'disabled')>Disabled</option>
+                                <option value="enabled" @selected($egg->subdomain_default_policy === 'enabled')>Enabled</option>
+                            </select>
+                        </div>
+                        <div class="form-group col-md-4">
+                            <label>DNS service profile</label>
+                            <select name="dns_service_profile_id" class="form-control">
+                                <option value="">None</option>
+                                @foreach($dnsServiceProfiles as $profile)
+                                    <option value="{{ $profile->id }}" @selected($egg->dns_service_profile_id === $profile->id)>{{ $profile->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="form-group col-md-4">
+                            <div class="checkbox checkbox-primary">
+                                <input id="pSubdomainOverride" name="subdomain_server_override_allowed" type="checkbox" value="1" @checked($egg->subdomain_server_override_allowed) />
+                                <label for="pSubdomainOverride">Allow per-server policy overrides</label>
+                            </div>
+                        </div>
+                        <div class="form-group col-xs-12">
+                            <label>Operator notes</label>
+                            <textarea name="subdomain_notes" class="form-control" rows="3">{{ $egg->subdomain_notes }}</textarea>
+                        </div>
+                    </div>
+                    <div class="alert alert-info no-margin-bottom">
+                        SRV behavior, protocol, service label, and default port are defined by the selected service profile. Generic profiles do not hide arbitrary ports.
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xs-12">
+            <div class="box">
+                <div class="box-header with-border">
                     <h3 class="box-title">Process Management</h3>
                 </div>
                 <div class="box-body">
@@ -208,6 +256,7 @@
     @parent
     <script>
     $('#pConfigFrom').select2();
+    $('select[name="dns_service_profile_id"]').select2();
     $('#deleteButton').on('mouseenter', function (event) {
         $(this).find('i').html(' Delete Egg');
     }).on('mouseleave', function (event) {

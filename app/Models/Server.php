@@ -44,6 +44,8 @@ use Pterodactyl\Exceptions\Http\Server\ServerStateConflictException;
  * @property int|null $database_limit
  * @property int $backup_limit
  * @property int $game_slot_limit
+ * @property string $subdomain_policy
+ * @property int $subdomain_limit
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @property \Illuminate\Support\Carbon|null $installed_at
@@ -176,6 +178,13 @@ class Server extends Model implements Identifiable
         'allocation_limit' => 'sometimes|nullable|integer|min:0',
         'backup_limit' => 'present|nullable|integer|min:0',
         'game_slot_limit' => 'sometimes|integer|min:1|max:100',
+        'subdomain_policy' => 'sometimes|in:enabled,disabled,inherit',
+        'subdomain_limit' => 'sometimes|integer|min:0|max:100',
+        'dns_service_profile_id' => 'nullable|integer|exists:dns_service_profiles,id',
+        'subdomain_domain_restrictions' => 'nullable|array',
+        'subdomain_domain_restrictions.*' => 'integer|exists:managed_domains,id',
+        'subdomain_policy_source' => 'nullable|string|max:191',
+        'subdomain_admin_notes' => 'nullable|string|max:5000',
     ];
 
     /**
@@ -198,6 +207,9 @@ class Server extends Model implements Identifiable
         'allocation_limit' => 'integer',
         'backup_limit' => 'integer',
         'game_slot_limit' => 'integer',
+        'subdomain_limit' => 'integer',
+        'dns_service_profile_id' => 'integer',
+        'subdomain_domain_restrictions' => 'array',
         self::CREATED_AT => 'datetime',
         self::UPDATED_AT => 'datetime',
         'deleted_at' => 'datetime',
@@ -386,6 +398,19 @@ class Server extends Model implements Identifiable
     public function gameSwitchOperations(): HasMany
     {
         return $this->hasMany(GameSwitchOperation::class);
+    }
+
+    /**
+     * Managed DNS hostnames attached to existing allocations on this server.
+     */
+    public function managedSubdomains(): HasMany
+    {
+        return $this->hasMany(ManagedSubdomain::class);
+    }
+
+    public function dnsServiceProfile(): BelongsTo
+    {
+        return $this->belongsTo(DnsServiceProfile::class);
     }
 
     /**

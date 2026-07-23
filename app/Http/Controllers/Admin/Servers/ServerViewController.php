@@ -6,6 +6,8 @@ use Illuminate\View\View;
 use Illuminate\Http\Request;
 use Pterodactyl\Models\Nest;
 use Pterodactyl\Models\Server;
+use Pterodactyl\Models\ManagedDomain;
+use Pterodactyl\Models\DnsServiceProfile;
 use Pterodactyl\Exceptions\DisplayException;
 use Pterodactyl\Http\Controllers\Controller;
 use Pterodactyl\Services\Servers\EnvironmentService;
@@ -60,6 +62,8 @@ class ServerViewController extends Controller
             'server' => $server,
             'assigned' => $allocations->where('server_id', $server->id)->sortBy('port')->sortBy('ip'),
             'unassigned' => $allocations->where('server_id', null)->sortBy('port')->sortBy('ip'),
+            'managedDomains' => ManagedDomain::query()->orderBy('domain')->get(),
+            'dnsServiceProfiles' => DnsServiceProfile::query()->where('enabled', true)->orderBy('name')->get(),
         ]);
     }
 

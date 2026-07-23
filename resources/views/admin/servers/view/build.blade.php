@@ -126,6 +126,56 @@
                                     </div>
                                     <p class="text-muted small">How many game slots this server may hold. A value of 1 disables game switching. Only one slot runs at a time; all slots share this server's resources, ports, and disk.</p>
                                 </div>
+                                <div class="form-group col-xs-6">
+                                    <label for="subdomain_limit" class="control-label">Managed Subdomain Limit</label>
+                                    <input type="number" min="0" max="100" name="subdomain_limit" class="form-control" value="{{ old('subdomain_limit', $server->subdomain_limit) }}"/>
+                                    <p class="text-muted small">Lowering this limit never deletes DNS records. Existing records above the limit remain visible but new records are blocked.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-xs-12">
+                    <div class="box">
+                        <div class="box-header with-border">
+                            <h3 class="box-title">Managed DNS Entitlement</h3>
+                        </div>
+                        <div class="box-body">
+                            <div class="row">
+                                <div class="form-group col-md-4">
+                                    <label for="subdomain_policy">Access policy</label>
+                                    <select name="subdomain_policy" class="form-control">
+                                        @foreach(['inherit' => 'Inherit egg default', 'enabled' => 'Enabled', 'disabled' => 'Disabled'] as $value => $label)
+                                            <option value="{{ $value }}" @selected(old('subdomain_policy', $server->subdomain_policy) === $value)>{{ $label }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div class="form-group col-md-4">
+                                    <label for="dns_service_profile_id">Service profile override</label>
+                                    <select name="dns_service_profile_id" class="form-control">
+                                        <option value="">Detect from active game</option>
+                                        @foreach($dnsServiceProfiles as $profile)
+                                            <option value="{{ $profile->id }}" @selected((int) old('dns_service_profile_id', $server->dns_service_profile_id) === $profile->id)>{{ $profile->name }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div class="form-group col-md-4">
+                                    <label for="subdomain_policy_source">Policy source</label>
+                                    <input name="subdomain_policy_source" class="form-control" value="{{ old('subdomain_policy_source', $server->subdomain_policy_source) }}" placeholder="plan, reseller, manual"/>
+                                </div>
+                                <div class="form-group col-xs-12">
+                                    <label>Allowed parent domains</label>
+                                    <select name="subdomain_domain_restrictions[]" class="form-control" multiple>
+                                        @foreach($managedDomains as $domain)
+                                            <option value="{{ $domain->id }}" @selected(in_array($domain->id, old('subdomain_domain_restrictions', $server->subdomain_domain_restrictions ?? [])))>{{ $domain->domain }}</option>
+                                        @endforeach
+                                    </select>
+                                    <p class="text-muted small">Leave empty to allow every otherwise eligible parent domain.</p>
+                                </div>
+                                <div class="form-group col-xs-12">
+                                    <label for="subdomain_admin_notes">Administrative notes</label>
+                                    <textarea name="subdomain_admin_notes" class="form-control" rows="2">{{ old('subdomain_admin_notes', $server->subdomain_admin_notes) }}</textarea>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -190,5 +240,6 @@
     $('#pAddAllocations').select2();
     $('#pRemoveAllocations').select2();
     $('#pAllocation').select2();
+    $('select[name="dns_service_profile_id"], select[name="subdomain_domain_restrictions[]"]').select2();
     </script>
 @endsection

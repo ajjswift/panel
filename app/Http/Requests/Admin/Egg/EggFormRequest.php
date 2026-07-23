@@ -14,6 +14,11 @@ class EggFormRequest extends AdminFormRequest
             'docker_images' => ['required', 'string', 'regex:/^[\w#\.\/\- ]*\|?~?[\w\.\/\-:@ ]*$/im'],
             'force_outgoing_ip' => 'sometimes|boolean',
             'game_switch_enabled' => 'sometimes|boolean',
+            'subdomain_compatibility' => 'sometimes|in:compatible,incompatible',
+            'subdomain_default_policy' => 'sometimes|in:enabled,disabled',
+            'dns_service_profile_id' => 'nullable|integer|exists:dns_service_profiles,id',
+            'subdomain_server_override_allowed' => 'sometimes|boolean',
+            'subdomain_notes' => 'nullable|string|max:5000',
             'file_denylist' => 'array',
             'features' => 'sometimes|array',
             'startup' => 'required|string',
@@ -45,6 +50,9 @@ class EggFormRequest extends AdminFormRequest
         return array_merge($data, [
             'force_outgoing_ip' => array_get($data, 'force_outgoing_ip', false),
             'game_switch_enabled' => array_get($data, 'game_switch_enabled', false),
+            'subdomain_server_override_allowed' => array_get($data, 'subdomain_server_override_allowed', false),
+            'subdomain_compatibility' => array_get($data, 'subdomain_compatibility', 'incompatible'),
+            'subdomain_default_policy' => array_get($data, 'subdomain_default_policy', 'disabled'),
             'features' => array_get($data, 'features', []),
         ]);
     }

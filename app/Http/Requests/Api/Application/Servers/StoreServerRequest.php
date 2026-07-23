@@ -48,6 +48,13 @@ class StoreServerRequest extends ApplicationApiRequest
             'feature_limits.databases' => $rules['database_limit'],
             'feature_limits.allocations' => $rules['allocation_limit'],
             'feature_limits.backups' => $rules['backup_limit'],
+            'feature_limits.game_slots' => $rules['game_slot_limit'],
+            'feature_limits.subdomains' => $rules['subdomain_limit'],
+            'subdomain_policy' => $rules['subdomain_policy'],
+            'dns_service_profile_id' => $rules['dns_service_profile_id'],
+            'subdomain_domain_restrictions' => $rules['subdomain_domain_restrictions'],
+            'subdomain_policy_source' => $rules['subdomain_policy_source'],
+            'subdomain_admin_notes' => $rules['subdomain_admin_notes'],
 
             // Placeholders for rules added in withValidator() function.
             'allocation.default' => '',
@@ -94,6 +101,13 @@ class StoreServerRequest extends ApplicationApiRequest
             'database_limit' => array_get($data, 'feature_limits.databases'),
             'allocation_limit' => array_get($data, 'feature_limits.allocations'),
             'backup_limit' => array_get($data, 'feature_limits.backups'),
+            'game_slot_limit' => array_get($data, 'feature_limits.game_slots', 1),
+            'subdomain_limit' => array_get($data, 'feature_limits.subdomains', 0),
+            'subdomain_policy' => array_get($data, 'subdomain_policy', 'inherit'),
+            'dns_service_profile_id' => array_get($data, 'dns_service_profile_id'),
+            'subdomain_domain_restrictions' => array_get($data, 'subdomain_domain_restrictions'),
+            'subdomain_policy_source' => array_get($data, 'subdomain_policy_source'),
+            'subdomain_admin_notes' => array_get($data, 'subdomain_admin_notes'),
             'oom_disabled' => array_get($data, 'oom_disabled'),
         ];
     }

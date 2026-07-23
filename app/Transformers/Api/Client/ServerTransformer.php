@@ -73,7 +73,9 @@ class ServerTransformer extends BaseClientTransformer
                 'allocations' => $server->allocation_limit,
                 'backups' => $server->backup_limit,
                 'game_slots' => $server->game_slot_limit,
+                'subdomains' => $server->subdomain_limit,
             ],
+            'subdomain_policy' => $server->subdomain_policy,
             'status' => $server->status,
             // This field is deprecated, please use "status".
             'is_suspended' => $server->isSuspended(),

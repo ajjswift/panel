@@ -89,6 +89,7 @@ class Node extends Model implements Identifiable
     protected $fillable = [
         'public', 'name', 'location_id',
         'description', 'fqdn', 'scheme', 'behind_proxy',
+        'dns_target_ipv4', 'dns_target_ipv6', 'dns_target_hostname',
         'memory', 'memory_overallocate', 'disk',
         'disk_overallocate', 'upload_size', 'daemonBase',
         'daemonSFTP', 'daemonListen',
@@ -101,6 +102,9 @@ class Node extends Model implements Identifiable
         'location_id' => 'required|exists:locations,id',
         'public' => 'boolean',
         'fqdn' => 'required|string',
+        'dns_target_ipv4' => 'nullable|ipv4',
+        'dns_target_ipv6' => 'nullable|ipv6',
+        'dns_target_hostname' => 'nullable|string|max:191',
         'scheme' => 'required',
         'behind_proxy' => 'boolean',
         'memory' => 'required|numeric|min:1',

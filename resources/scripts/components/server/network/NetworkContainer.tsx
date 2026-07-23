@@ -1,82 +1,72 @@
-import React, { useEffect, useState } from 'react';
-import Spinner from '@/components/elements/Spinner';
-import { useFlashKey } from '@/plugins/useFlash';
-import ServerContentBlock from '@/components/elements/ServerContentBlock';
-import { ServerContext } from '@/state/server';
-import AllocationRow from '@/components/server/network/AllocationRow';
-import Button from '@/components/elements/Button';
-import createServerAllocation from '@/api/server/network/createServerAllocation';
+import React from 'react';
 import tw from 'twin.macro';
+import { NavLink, Redirect, useLocation, useRouteMatch } from 'react-router-dom';
+import ServerContentBlock from '@/components/elements/ServerContentBlock';
 import Can from '@/components/elements/Can';
-import SpinnerOverlay from '@/components/elements/SpinnerOverlay';
-import getServerAllocations from '@/api/swr/getServerAllocations';
-import isEqual from 'react-fast-compare';
-import { useDeepCompareEffect } from '@/plugins/useDeepCompareEffect';
+import NetworkOverview from '@/components/server/network/NetworkOverview';
+import AllocationsSection from '@/components/server/network/AllocationsSection';
+import SubdomainsSection from '@/components/server/network/SubdomainsSection';
+import RoutingSection from '@/components/server/network/RoutingSection';
+
+const tabStyle = tw`inline-flex items-center px-3 py-2 rounded-md text-sm font-medium text-neutral-300 hover:text-neutral-100 hover:bg-neutral-700 focus:outline-none`;
 
 const NetworkContainer = () => {
-    const [loading, setLoading] = useState(false);
-    const uuid = ServerContext.useStoreState((state) => state.server.data!.uuid);
-    const allocationLimit = ServerContext.useStoreState((state) => state.server.data!.featureLimits.allocations);
-    const allocations = ServerContext.useStoreState((state) => state.server.data!.allocations, isEqual);
-    const setServerFromState = ServerContext.useStoreActions((actions) => actions.server.setServerFromState);
-
-    const { clearFlashes, clearAndAddHttpError } = useFlashKey('server:network');
-    const { data, error, mutate } = getServerAllocations();
-
-    useEffect(() => {
-        mutate(allocations);
-    }, []);
-
-    useEffect(() => {
-        clearAndAddHttpError(error);
-    }, [error]);
-
-    useDeepCompareEffect(() => {
-        if (!data) return;
-
-        setServerFromState((state) => ({ ...state, allocations: data }));
-    }, [data]);
-
-    const onCreateAllocation = () => {
-        clearFlashes();
-
-        setLoading(true);
-        createServerAllocation(uuid)
-            .then((allocation) => {
-                setServerFromState((s) => ({ ...s, allocations: s.allocations.concat(allocation) }));
-                return mutate(data?.concat(allocation), false);
-            })
-            .catch((error) => clearAndAddHttpError(error))
-            .then(() => setLoading(false));
-    };
+    const match = useRouteMatch();
+    const location = useLocation();
+    const root = match.url.replace(/\/(allocations|subdomains|routing)\/?$/, '');
+    const section = location.pathname.endsWith('/allocations')
+        ? 'allocations'
+        : location.pathname.endsWith('/subdomains')
+        ? 'subdomains'
+        : location.pathname.endsWith('/routing')
+        ? 'routing'
+        : 'overview';
 
     return (
         <ServerContentBlock showFlashKey={'server:network'} title={'Network'}>
-            {!data ? (
-                <Spinner size={'large'} centered />
-            ) : (
-                <>
-                    {data.map((allocation) => (
-                        <AllocationRow key={`${allocation.ip}:${allocation.port}`} allocation={allocation} />
-                    ))}
-                    {allocationLimit > 0 && (
-                        <Can action={'allocation.create'}>
-                            <SpinnerOverlay visible={loading} />
-                            <div css={tw`mt-6 sm:flex items-center justify-end`}>
-                                <p css={tw`text-sm text-neutral-300 mb-4 sm:mr-6 sm:mb-0`}>
-                                    You are currently using {data.length} of {allocationLimit} allowed allocations for
-                                    this server.
-                                </p>
-                                {allocationLimit > data.length && (
-                                    <Button css={tw`w-full sm:w-auto`} color={'primary'} onClick={onCreateAllocation}>
-                                        Create Allocation
-                                    </Button>
-                                )}
-                            </div>
-                        </Can>
-                    )}
-                </>
+            <div css={tw`mb-6 rounded-lg border border-neutral-600 bg-neutral-800 p-2`}>
+                <nav aria-label={'Network sections'} css={tw`flex gap-1 overflow-x-auto`}>
+                    <NavLink
+                        exact
+                        to={root}
+                        css={tabStyle}
+                        activeClassName={'bg-primary-600 text-white'}
+                        aria-label={'Network overview'}
+                    >
+                        Overview
+                    </NavLink>
+                    <Can action={'allocation.read'}>
+                        <NavLink
+                            to={`${root}/allocations`}
+                            css={tabStyle}
+                            activeClassName={'bg-primary-600 text-white'}
+                        >
+                            Allocations
+                        </NavLink>
+                    </Can>
+                    <Can action={'subdomain.read'}>
+                        <NavLink to={`${root}/subdomains`} css={tabStyle} activeClassName={'bg-primary-600 text-white'}>
+                            Subdomains
+                        </NavLink>
+                    </Can>
+                    <NavLink to={`${root}/routing`} css={tabStyle} activeClassName={'bg-primary-600 text-white'}>
+                        Routing
+                    </NavLink>
+                </nav>
+            </div>
+
+            {section === 'overview' && <NetworkOverview />}
+            {section === 'allocations' && (
+                <Can action={'allocation.read'} renderOnError={<Redirect to={root} />}>
+                    <AllocationsSection />
+                </Can>
             )}
+            {section === 'subdomains' && (
+                <Can action={'subdomain.read'} renderOnError={<Redirect to={root} />}>
+                    <SubdomainsSection />
+                </Can>
+            )}
+            {section === 'routing' && <RoutingSection />}
         </ServerContentBlock>
     );
 };

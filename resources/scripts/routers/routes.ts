@@ -158,9 +158,15 @@ export default {
         },
         {
             path: '/network',
-            permission: 'allocation.*',
+            permission: ['allocation.*', 'subdomain.*'],
             name: 'Network',
             icon: faNetworkWired,
+            component: NetworkContainer,
+        },
+        {
+            path: '/network/:section(allocations|subdomains|routing)',
+            permission: ['allocation.*', 'subdomain.*'],
+            name: undefined,
             component: NetworkContainer,
         },
         {

@@ -48,6 +48,15 @@ class Permission extends Model
     public const ACTION_ALLOCATION_UPDATE = 'allocation.update';
     public const ACTION_ALLOCATION_DELETE = 'allocation.delete';
 
+    public const ACTION_SUBDOMAIN_READ = 'subdomain.read';
+    public const ACTION_SUBDOMAIN_CREATE = 'subdomain.create';
+    public const ACTION_SUBDOMAIN_UPDATE = 'subdomain.update';
+    public const ACTION_SUBDOMAIN_REASSIGN = 'subdomain.reassign';
+    public const ACTION_SUBDOMAIN_DELETE = 'subdomain.delete';
+    public const ACTION_SUBDOMAIN_REFRESH = 'subdomain.refresh';
+    public const ACTION_SUBDOMAIN_REPAIR = 'subdomain.repair';
+    public const ACTION_SUBDOMAIN_HISTORY = 'subdomain.history';
+
     public const ACTION_FILE_READ = 'file.read';
     public const ACTION_FILE_READ_CONTENT = 'file.read-content';
     public const ACTION_FILE_CREATE = 'file.create';
@@ -166,6 +175,20 @@ class Permission extends Model
                 'create' => 'Allows a user to assign additional allocations to the server.',
                 'update' => 'Allows a user to change the primary server allocation and attach notes to each allocation.',
                 'delete' => 'Allows a user to delete an allocation from the server.',
+            ],
+        ],
+
+        'subdomain' => [
+            'description' => 'Permissions that control access to managed DNS hostnames for this server.',
+            'keys' => [
+                'read' => 'Allows a user to view managed hostnames, DNS state, and connection information.',
+                'create' => 'Allows a user to create a managed hostname for an allocation already assigned to this server.',
+                'update' => 'Allows a user to edit supported managed-hostname options.',
+                'reassign' => 'Allows a user to associate a managed hostname with another existing allocation on this server.',
+                'delete' => 'Allows a user to delete a managed hostname and its application-owned DNS records.',
+                'refresh' => 'Allows a user to refresh locally stored DNS synchronization status.',
+                'repair' => 'Allows a user to queue repair of application-owned DNS records.',
+                'history' => 'Allows a user to view managed DNS synchronization history.',
             ],
         ],
 

@@ -102,6 +102,11 @@
                                 <i class="fa fa-sitemap"></i> <span>Nodes</span>
                             </a>
                         </li>
+                        <li class="{{ ! starts_with(Route::currentRouteName(), 'admin.managed-dns') ?: 'active' }}">
+                            <a href="{{ route('admin.managed-dns') }}">
+                                <i class="fa fa-cloud"></i> <span>Managed DNS</span>
+                            </a>
+                        </li>
                         <li class="{{ ! starts_with(Route::currentRouteName(), 'admin.servers') ?: 'active' }}">
                             <a href="{{ route('admin.servers') }}">
                                 <i class="fa fa-server"></i> <span>Servers</span>

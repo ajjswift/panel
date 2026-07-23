@@ -46,6 +46,13 @@ class UpdateServerBuildConfigurationRequest extends ServerWriteRequest
             'feature_limits.databases' => $rules['database_limit'],
             'feature_limits.allocations' => $rules['allocation_limit'],
             'feature_limits.backups' => $rules['backup_limit'],
+            'feature_limits.game_slots' => $rules['game_slot_limit'],
+            'feature_limits.subdomains' => $rules['subdomain_limit'],
+            'subdomain_policy' => $rules['subdomain_policy'],
+            'dns_service_profile_id' => $rules['dns_service_profile_id'],
+            'subdomain_domain_restrictions' => $rules['subdomain_domain_restrictions'],
+            'subdomain_policy_source' => $rules['subdomain_policy_source'],
+            'subdomain_admin_notes' => $rules['subdomain_admin_notes'],
         ];
     }
 
@@ -60,6 +67,8 @@ class UpdateServerBuildConfigurationRequest extends ServerWriteRequest
         $data['database_limit'] = $data['feature_limits']['databases'] ?? null;
         $data['allocation_limit'] = $data['feature_limits']['allocations'] ?? null;
         $data['backup_limit'] = $data['feature_limits']['backups'] ?? null;
+        $data['game_slot_limit'] = $data['feature_limits']['game_slots'] ?? null;
+        $data['subdomain_limit'] = $data['feature_limits']['subdomains'] ?? null;
         unset($data['allocation'], $data['feature_limits']);
 
         // Adjust the limits field to match what is expected by the model.
@@ -87,6 +96,8 @@ class UpdateServerBuildConfigurationRequest extends ServerWriteRequest
             'feature_limits.databases' => 'Database Limit',
             'feature_limits.allocations' => 'Allocation Limit',
             'feature_limits.backups' => 'Backup Limit',
+            'feature_limits.game_slots' => 'Game Slot Limit',
+            'feature_limits.subdomains' => 'Managed Subdomain Limit',
         ];
     }
 

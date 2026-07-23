@@ -130,6 +130,42 @@
                         </div>
                         <p class="text-muted small">The total number of backups that can be created for this server.</p>
                     </div>
+                    <div class="form-group col-xs-6">
+                        <label for="pGameSlotLimit" class="control-label">Game Slot Limit</label>
+                        <input type="number" min="1" max="100" id="pGameSlotLimit" name="game_slot_limit" class="form-control" value="{{ old('game_slot_limit', 1) }}"/>
+                        <p class="text-muted small">A value of 1 disables customer game switching.</p>
+                    </div>
+                    <div class="form-group col-xs-6">
+                        <label for="pSubdomainLimit" class="control-label">Managed Subdomain Limit</label>
+                        <input type="number" min="0" max="100" id="pSubdomainLimit" name="subdomain_limit" class="form-control" value="{{ old('subdomain_limit', 0) }}"/>
+                        <p class="text-muted small">No DNS records are created automatically during provisioning.</p>
+                    </div>
+                    <div class="form-group col-xs-6">
+                        <label for="pSubdomainPolicy" class="control-label">Managed Subdomain Entitlement</label>
+                        <select id="pSubdomainPolicy" name="subdomain_policy" class="form-control">
+                            <option value="inherit" @selected(old('subdomain_policy', 'inherit') === 'inherit')>Inherit selected egg default</option>
+                            <option value="enabled" @selected(old('subdomain_policy') === 'enabled')>Enabled override</option>
+                            <option value="disabled" @selected(old('subdomain_policy') === 'disabled')>Disabled override</option>
+                        </select>
+                    </div>
+                    <div class="form-group col-xs-6">
+                        <label for="pDnsServiceProfile">DNS profile override</label>
+                        <select id="pDnsServiceProfile" name="dns_service_profile_id" class="form-control">
+                            <option value="">Detect from selected/active egg</option>
+                            @foreach($dnsServiceProfiles as $profile)
+                                <option value="{{ $profile->id }}" @selected((int) old('dns_service_profile_id') === $profile->id)>{{ $profile->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="form-group col-xs-12">
+                        <label>Allowed parent domains</label>
+                        <select name="subdomain_domain_restrictions[]" class="form-control" multiple>
+                            @foreach($managedDomains as $domain)
+                                <option value="{{ $domain->id }}" @selected(in_array($domain->id, old('subdomain_domain_restrictions', [])))>{{ $domain->domain }}</option>
+                            @endforeach
+                        </select>
+                        <p class="text-muted small">Leave empty to use every domain allowed by node, egg, and service-profile policy.</p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -342,6 +378,7 @@
 
     <script type="application/javascript">
         $(document).ready(function() {
+            $('#pDnsServiceProfile, select[name="subdomain_domain_restrictions[]"]').select2();
             // Persist 'Server Owner' select2
             @if (old('owner_id'))
                 $.ajax({

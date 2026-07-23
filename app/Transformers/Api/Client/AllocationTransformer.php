@@ -23,6 +23,7 @@ class AllocationTransformer extends BaseClientTransformer
             'port' => $model->port,
             'notes' => $model->notes,
             'is_default' => $model->server->allocation_id === $model->id,
+            'managed_hostname_count' => (int) ($model->getAttribute('managed_hostname_count') ?? 0),
         ];
     }
 }

@@ -6,7 +6,9 @@ use Pterodactyl\Models\Server;
 use Illuminate\Http\JsonResponse;
 use Pterodactyl\Facades\Activity;
 use Pterodactyl\Models\Allocation;
+use Pterodactyl\Models\ManagedSubdomain;
 use Illuminate\Database\ConnectionInterface;
+use Pterodactyl\Enum\ManagedSubdomainStatus;
 use Pterodactyl\Exceptions\DisplayException;
 use Pterodactyl\Repositories\Eloquent\ServerRepository;
 use Pterodactyl\Transformers\Api\Client\AllocationTransformer;
@@ -37,7 +39,11 @@ class NetworkAllocationController extends ClientApiController
      */
     public function index(GetNetworkRequest $request, Server $server): array
     {
-        return $this->fractal->collection($server->allocations)
+        $allocations = $server->allocations()
+            ->withCount(['managedSubdomains as managed_hostname_count' => fn ($query) => $query->whereNull('deleted_at')])
+            ->get();
+
+        return $this->fractal->collection($allocations)
             ->transformWith($this->getTransformer(AllocationTransformer::class))
             ->toArray();
     }
@@ -132,6 +138,14 @@ class NetworkAllocationController extends ClientApiController
             'notes' => null,
             'server_id' => null,
         ]);
+        ManagedSubdomain::query()
+            ->where('allocation_id', $allocation->id)
+            ->whereNull('deleted_at')
+            ->update([
+                'status' => ManagedSubdomainStatus::RepairRequired->value,
+                'last_error_code' => 'allocation_unassigned',
+                'sanitized_error_message' => 'The associated allocation is no longer assigned to this server. Reassign this hostname to an existing allocation.',
+            ]);
 
         Activity::event('server:allocation.delete')
             ->subject($allocation)

@@ -11,9 +11,10 @@ import { Button } from '@/components/elements/button/index';
 
 interface Props {
     allocation: number;
+    managedHostnameCount?: number;
 }
 
-const DeleteAllocationButton = ({ allocation }: Props) => {
+const DeleteAllocationButton = ({ allocation, managedHostnameCount = 0 }: Props) => {
     const [confirm, setConfirm] = useState(false);
 
     const uuid = ServerContext.useStoreState((state) => state.server.data!.uuid);
@@ -44,6 +45,10 @@ const DeleteAllocationButton = ({ allocation }: Props) => {
                 onConfirmed={deleteAllocation}
             >
                 This allocation will be immediately removed from your server.
+                {managedHostnameCount > 0 &&
+                    ` ${managedHostnameCount} managed hostname${
+                        managedHostnameCount === 1 ? '' : 's'
+                    } will be preserved and marked for reassignment.`}
             </Dialog.Confirm>
             <Button.Danger
                 variant={Button.Variants.Secondary}

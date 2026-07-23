@@ -107,6 +107,11 @@ class Egg extends Model implements Identifiable
         'script_container',
         'copy_script_from',
         'game_switch_enabled',
+        'subdomain_compatibility',
+        'subdomain_default_policy',
+        'dns_service_profile_id',
+        'subdomain_server_override_allowed',
+        'subdomain_notes',
     ];
 
     /**
@@ -117,6 +122,8 @@ class Egg extends Model implements Identifiable
         'config_from' => 'integer',
         'script_is_privileged' => 'boolean',
         'game_switch_enabled' => 'boolean',
+        'dns_service_profile_id' => 'integer',
+        'subdomain_server_override_allowed' => 'boolean',
         'force_outgoing_ip' => 'boolean',
         'copy_script_from' => 'integer',
         'features' => 'array',
@@ -143,6 +150,11 @@ class Egg extends Model implements Identifiable
         'config_files' => 'required_without:config_from|nullable|json',
         'update_url' => 'sometimes|nullable|string',
         'force_outgoing_ip' => 'sometimes|boolean',
+        'subdomain_compatibility' => 'sometimes|in:compatible,incompatible',
+        'subdomain_default_policy' => 'sometimes|in:enabled,disabled',
+        'dns_service_profile_id' => 'nullable|integer|exists:dns_service_profiles,id',
+        'subdomain_server_override_allowed' => 'sometimes|boolean',
+        'subdomain_notes' => 'nullable|string|max:5000',
     ];
 
     protected $attributes = [
@@ -296,6 +308,11 @@ class Egg extends Model implements Identifiable
     public function variables(): HasMany
     {
         return $this->hasMany(EggVariable::class, 'egg_id');
+    }
+
+    public function dnsServiceProfile(): BelongsTo
+    {
+        return $this->belongsTo(DnsServiceProfile::class);
     }
 
     /**

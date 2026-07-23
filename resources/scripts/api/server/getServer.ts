@@ -10,6 +10,7 @@ export interface Allocation {
     port: number;
     notes: string | null;
     isDefault: boolean;
+    managedHostnameCount: number;
 }
 
 export interface Server {
@@ -57,6 +58,7 @@ export interface Server {
         allocations: number;
         backups: number;
         gameSlots: number;
+        subdomains: number;
     };
     isTransferring: boolean;
     variables: ServerEggVariable[];
@@ -87,6 +89,7 @@ export const rawDataToServerObject = ({ attributes: data }: FractalResponseData)
         allocations: data.feature_limits.allocations,
         backups: data.feature_limits.backups,
         gameSlots: data.feature_limits.game_slots,
+        subdomains: data.feature_limits.subdomains,
     },
     isTransferring: data.is_transferring,
     variables: ((data.relationships?.variables as FractalResponseList | undefined)?.data || []).map(

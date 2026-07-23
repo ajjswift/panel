@@ -6,7 +6,9 @@ use Illuminate\Support\Arr;
 use Pterodactyl\Models\Server;
 use Pterodactyl\Models\Allocation;
 use Illuminate\Support\Facades\Log;
+use Pterodactyl\Enum\SubdomainPolicy;
 use Illuminate\Database\ConnectionInterface;
+use Pterodactyl\Enum\SubdomainCompatibility;
 use Pterodactyl\Exceptions\DisplayException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Pterodactyl\Repositories\Wings\DaemonServerRepository;
@@ -49,6 +51,27 @@ class BuildModificationService
             // If any of these values are passed through in the data array go ahead and set
             // them correctly on the server model.
             $merge = Arr::only($data, ['oom_disabled', 'memory', 'swap', 'io', 'cpu', 'threads', 'disk', 'allocation_id']);
+            $subdomainPolicy = Arr::get($data, 'subdomain_policy', $server->subdomain_policy);
+            if (
+                $subdomainPolicy === SubdomainPolicy::Enabled->value
+                && $server->egg->subdomain_compatibility !== SubdomainCompatibility::Compatible->value
+            ) {
+                throw new DisplayException('Managed subdomains cannot be enabled because this server egg is marked incompatible.');
+            }
+            if (
+                $subdomainPolicy === SubdomainPolicy::Enabled->value
+                && !$server->egg->subdomain_server_override_allowed
+                && $server->egg->subdomain_default_policy !== SubdomainPolicy::Enabled->value
+            ) {
+                throw new DisplayException('This egg does not allow a server-level managed-subdomain override.');
+            }
+            if (
+                Arr::get($data, 'dns_service_profile_id')
+                && !$server->egg->subdomain_server_override_allowed
+                && (int) Arr::get($data, 'dns_service_profile_id') !== $server->egg->dns_service_profile_id
+            ) {
+                throw new DisplayException('This egg does not allow a server-level DNS service-profile override.');
+            }
 
             $server->forceFill(array_merge($merge, [
                 'database_limit' => Arr::get($data, 'database_limit', 0) ?? null,
@@ -58,6 +81,14 @@ class BuildModificationService
                 // limit never deletes existing slots (see the reconciliation in
                 // the game-slot services), it only prevents new ones.
                 'game_slot_limit' => max(1, (int) Arr::get($data, 'game_slot_limit', $server->game_slot_limit)),
+                'subdomain_policy' => $subdomainPolicy,
+                'subdomain_limit' => max(0, (int) Arr::get($data, 'subdomain_limit', $server->subdomain_limit)),
+                'dns_service_profile_id' => Arr::get($data, 'dns_service_profile_id', $server->dns_service_profile_id) ?: null,
+                'subdomain_domain_restrictions' => Arr::has($data, 'subdomain_domain_restrictions')
+                    ? array_values(array_filter(array_map('intval', (array) $data['subdomain_domain_restrictions'])))
+                    : $server->subdomain_domain_restrictions,
+                'subdomain_policy_source' => Arr::get($data, 'subdomain_policy_source', $server->subdomain_policy_source),
+                'subdomain_admin_notes' => Arr::get($data, 'subdomain_admin_notes', $server->subdomain_admin_notes),
             ]))->saveOrFail();
 
             // Reconcile slot state with the (possibly reduced) allowance without
