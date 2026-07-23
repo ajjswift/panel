@@ -62,8 +62,8 @@
     :root[data-theme='dark'] {
         color-scheme: dark;
 
-        --gray-900: 9 14 33;      /* deepest chrome (#090e21) */
-        --gray-800: 13 19 43;     /* page background (#0d132b) */
+        --gray-900: 6 9 25;       /* deepest chrome (#060919) */
+        --gray-800: 9 13 31;      /* page background (#090d1f) */
         --gray-700: 22 30 61;     /* cards / surfaces (#161e3d) */
         --gray-600: 32 41 76;     /* elevated surfaces, inputs (#20294c) */
         --gray-500: 54 64 105;    /* borders, subdued controls (#364069) */
