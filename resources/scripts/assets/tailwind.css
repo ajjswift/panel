@@ -64,8 +64,8 @@
 
         --gray-900: 6 9 25;       /* deepest chrome (#060919) */
         --gray-800: 9 13 31;      /* page background (#090d1f) */
-        --gray-700: 27 36 66;     /* cards / surfaces (#1b2442) */
-        --gray-600: 32 41 76;     /* elevated surfaces, inputs (#20294c) */
+        --gray-700: 18 26 54;     /* cards / surfaces (#121a36) */
+        --gray-600: 26 35 71;     /* elevated surfaces, inputs (#1a2347) */
         --gray-500: 54 64 105;    /* borders, subdued controls (#364069) */
         --gray-400: 108 118 156;  /* strong borders, disabled text (#6c769c) */
         --gray-300: 168 176 195;  /* muted text (#a8b0c3) */
@@ -76,14 +76,14 @@
         --color-background: var(--gray-800);
         --color-surface: var(--gray-700);
         --color-surface-elevated: var(--gray-600);
-        --color-surface-hover: 35 45 82;  /* hover on cards (#232d52) */
-        --color-sidebar: 27 36 66;        /* sidebar chrome (#1b2442) */
-        --color-sidebar-hover: 39 49 86;  /* item hover on sidebar (#273156) */
+        --color-surface-hover: 24 33 66;  /* hover on cards (#182142) */
+        --color-sidebar: 18 26 54;        /* sidebar chrome (#121a36) */
+        --color-sidebar-hover: 28 38 76;  /* item hover on sidebar (#1c264c) */
         --color-text: var(--gray-100);
         --color-text-muted: var(--gray-300);
         --color-text-faint: var(--gray-400);
-        --color-border: 42 52 92;
-        --color-border-strong: 64 76 122;
+        --color-border: 36 46 84;
+        --color-border-strong: 58 70 116;
         --color-primary: var(--brand-500);
         --color-primary-hover: var(--brand-400);
         --color-secondary: var(--accent-500);
