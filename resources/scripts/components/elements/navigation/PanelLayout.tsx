@@ -84,7 +84,7 @@ const PanelLayout: React.FC<Props> = ({ sections, header, showAccountLink, child
                 {/* Mobile top bar */}
                 <header
                     className={
-                        'lg:hidden sticky top-0 z-20 flex items-center gap-2 h-14 px-2 bg-surface border-b border-line shadow-sm'
+                        'lg:hidden sticky top-0 z-20 flex items-center gap-2 h-14 px-2 bg-sidebar border-b border-line shadow-sm'
                     }
                 >
                     <button
@@ -92,7 +92,7 @@ const PanelLayout: React.FC<Props> = ({ sections, header, showAccountLink, child
                         onClick={() => setDrawerOpen(true)}
                         aria-label={'Open navigation'}
                         className={
-                            'flex items-center justify-center w-10 h-10 rounded-md text-body-muted hover:text-body hover:bg-surface-hover transition-colors duration-150'
+                            'flex items-center justify-center w-10 h-10 rounded-md text-body-muted hover:text-body hover:bg-sidebar-hover transition-colors duration-150'
                         }
                     >
                         <FontAwesomeIcon icon={faBars} />

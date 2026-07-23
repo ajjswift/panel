@@ -31,7 +31,7 @@ export default ({ compact, className }: { compact?: boolean; className?: string 
                     onClick={() => setMode(next.mode)}
                     className={classNames(
                         'flex items-center justify-center w-9 h-9 rounded-md transition-colors duration-150',
-                        'text-body-muted hover:text-body hover:bg-surface-hover',
+                        'text-body-muted hover:text-body hover:bg-sidebar-hover',
                         className
                     )}
                 >

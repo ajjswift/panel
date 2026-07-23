@@ -1,5 +1,5 @@
 .sidebar {
-    @apply flex flex-col h-full bg-surface border-r border-line;
+    @apply flex flex-col h-full bg-sidebar border-r border-line;
 }
 
 .brand {
@@ -32,7 +32,7 @@
     }
 
     &:hover {
-        @apply text-body bg-surface-hover;
+        @apply text-body bg-sidebar-hover;
     }
 
     & .label {

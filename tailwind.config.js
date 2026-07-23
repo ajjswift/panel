@@ -74,6 +74,10 @@ module.exports = {
                     elevated: varColor('color-surface-elevated'),
                     hover: varColor('color-surface-hover'),
                 },
+                sidebar: {
+                    DEFAULT: varColor('color-sidebar'),
+                    hover: varColor('color-sidebar-hover'),
+                },
                 body: {
                     DEFAULT: varColor('color-text'),
                     muted: varColor('color-text-muted'),
