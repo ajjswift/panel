@@ -62,13 +62,13 @@
     :root[data-theme='dark'] {
         color-scheme: dark;
 
-        --gray-900: 6 9 25;       /* deepest chrome (#060919) */
+        --gray-900: 6 8 16;       /* deepest chrome (#060810) */
         --gray-800: 9 13 31;      /* page background (#090d1f) */
-        --gray-700: 18 26 54;     /* cards / surfaces (#121a36) */
-        --gray-600: 26 35 71;     /* elevated surfaces, inputs (#1a2347) */
-        --gray-500: 54 64 105;    /* borders, subdued controls (#364069) */
-        --gray-400: 108 118 156;  /* strong borders, disabled text (#6c769c) */
-        --gray-300: 168 176 195;  /* muted text (#a8b0c3) */
+        --gray-700: 23 28 43;     /* cards / surfaces (#171c2b) */
+        --gray-600: 33 39 58;     /* elevated surfaces, inputs (#21273a) */
+        --gray-500: 60 67 92;     /* borders, subdued controls (#3c435c) */
+        --gray-400: 110 117 140;  /* strong borders, disabled text (#6e758c) */
+        --gray-300: 166 172 188;  /* muted text (#a6acbc) */
         --gray-200: 226 230 242;  /* body text (#e2e6f2) */
         --gray-100: 240 242 250;  /* high-emphasis text (#f0f2fa) */
         --gray-50: 247 248 252;   /* headings (#f7f8fc) */
@@ -76,14 +76,14 @@
         --color-background: var(--gray-800);
         --color-surface: var(--gray-700);
         --color-surface-elevated: var(--gray-600);
-        --color-surface-hover: 24 33 66;  /* hover on cards (#182142) */
-        --color-sidebar: 18 26 54;        /* sidebar chrome (#121a36) */
-        --color-sidebar-hover: 28 38 76;  /* item hover on sidebar (#1c264c) */
+        --color-surface-hover: 29 35 52;  /* hover on cards (#1d2334) */
+        --color-sidebar: 23 28 43;        /* sidebar chrome (#171c2b) */
+        --color-sidebar-hover: 36 43 62;  /* item hover on sidebar (#242b3e) */
         --color-text: var(--gray-100);
         --color-text-muted: var(--gray-300);
         --color-text-faint: var(--gray-400);
-        --color-border: 36 46 84;
-        --color-border-strong: 58 70 116;
+        --color-border: 40 46 66;
+        --color-border-strong: 62 70 96;
         --color-primary: var(--brand-500);
         --color-primary-hover: var(--brand-400);
         --color-secondary: var(--accent-500);
