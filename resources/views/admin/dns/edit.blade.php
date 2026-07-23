@@ -22,9 +22,27 @@
                     <div class="form-group col-md-4"><label>TTL</label><input name="ttl" type="number" value="{{ old('ttl', $domain->ttl) }}" class="form-control"></div>
                     <div class="form-group col-md-8"><label>Label pattern</label><input name="label_pattern" value="{{ old('label_pattern', $domain->label_pattern) }}" class="form-control"></div>
                     <div class="form-group col-xs-12"><label>Reserved labels</label><textarea name="reserved_labels" class="form-control">{{ implode(', ', $domain->reserved_labels ?? []) }}</textarea></div>
-                    <div class="checkbox col-xs-12"><label><input type="checkbox" name="enabled" value="1" @checked($domain->enabled)> Enabled for eligible servers</label></div>
-                    <div class="checkbox col-xs-6"><label><input type="checkbox" name="supports_direct_dns" value="1" @checked($domain->supports_direct_dns)> Direct DNS</label></div>
-                    <div class="checkbox col-xs-6"><label><input type="checkbox" name="supports_srv" value="1" @checked($domain->supports_srv)> SRV records</label></div>
+                    <div class="form-group col-xs-12">
+                        <input type="hidden" name="enabled" value="0">
+                        <div class="checkbox checkbox-primary no-margin-bottom">
+                            <input id="managedDomainEnabled" type="checkbox" name="enabled" value="1" @checked(old('enabled', $domain->enabled))>
+                            <label for="managedDomainEnabled" class="strong">Enabled for eligible servers</label>
+                        </div>
+                    </div>
+                    <div class="form-group col-xs-6">
+                        <input type="hidden" name="supports_direct_dns" value="0">
+                        <div class="checkbox checkbox-primary no-margin-bottom">
+                            <input id="managedDomainSupportsDirectDns" type="checkbox" name="supports_direct_dns" value="1" @checked(old('supports_direct_dns', $domain->supports_direct_dns))>
+                            <label for="managedDomainSupportsDirectDns" class="strong">Direct DNS</label>
+                        </div>
+                    </div>
+                    <div class="form-group col-xs-6">
+                        <input type="hidden" name="supports_srv" value="0">
+                        <div class="checkbox checkbox-primary no-margin-bottom">
+                            <input id="managedDomainSupportsSrv" type="checkbox" name="supports_srv" value="1" @checked(old('supports_srv', $domain->supports_srv))>
+                            <label for="managedDomainSupportsSrv" class="strong">SRV records</label>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
