@@ -19,6 +19,7 @@ export default () => {
     const defaultPage = Number(new URLSearchParams(search).get('page') || '1');
 
     const [page, setPage] = useState(!isNaN(defaultPage) && defaultPage > 0 ? defaultPage : 1);
+    const [pollForGameSwitches, setPollForGameSwitches] = useState(false);
     const { clearFlashes, clearAndAddHttpError } = useFlash();
     const uuid = useStoreState((state) => state.user.data!.uuid);
     const rootAdmin = useStoreState((state) => state.user.data!.rootAdmin);
@@ -26,8 +27,13 @@ export default () => {
 
     const { data: servers, error } = useSWR<PaginatedResult<Server>>(
         ['/api/client/servers', showOnlyAdmin && rootAdmin, page],
-        () => getServers({ page, type: showOnlyAdmin && rootAdmin ? 'admin' : undefined })
+        () => getServers({ page, type: showOnlyAdmin && rootAdmin ? 'admin' : undefined }),
+        { refreshInterval: pollForGameSwitches ? 2500 : 0 }
     );
+
+    useEffect(() => {
+        setPollForGameSwitches(servers?.items.some((server) => server.status === 'switching_game') ?? false);
+    }, [servers]);
 
     useEffect(() => {
         setPage(1);

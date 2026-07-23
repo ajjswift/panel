@@ -75,7 +75,7 @@ export default ({ server, className }: { server: Server; className?: string }) =
         return () => {
             interval.current && clearInterval(interval.current);
         };
-    }, [isSuspended, server.isNodeUnderMaintenance]);
+    }, [isSuspended, server.isNodeUnderMaintenance, server.status]);
 
     const alarms = { cpu: false, memory: false, disk: false };
     if (stats) {
@@ -116,7 +116,7 @@ export default ({ server, className }: { server: Server; className?: string }) =
                 </div>
             </div>
             <div css={tw`hidden col-span-7 lg:col-span-4 sm:flex items-baseline justify-center`}>
-                {!stats || isSuspended || server.isNodeUnderMaintenance ? (
+                {!stats || isSuspended || server.isNodeUnderMaintenance || server.isTransferring || server.status ? (
                     isSuspended ? (
                         <div css={tw`flex-1 text-center`}>
                             <span css={tw`bg-red-500 rounded px-2 py-1 text-red-100 text-xs`}>
