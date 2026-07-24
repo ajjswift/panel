@@ -272,11 +272,16 @@ class ManagedDnsSynchronizer
     {
         $provider = $this->providerFactory->for($managed->domain);
         $ownedIds = $managed->records()->whereNotNull('provider_record_id')->pluck('provider_record_id')->all();
-
-        $records = array_merge(
-            $provider->listRecords($managed->domain, $name),
-            $provider->listRecords($managed->domain, '*.' . $managed->domain->domain),
-        );
+        $records = [];
+        $names = array_unique([
+            strtolower(rtrim($name, '.')),
+            strtolower(rtrim($managed->fqdn, '.')),
+            '_minecraft._tcp.' . strtolower(rtrim($managed->fqdn, '.')),
+            '*.' . strtolower(rtrim($managed->domain->domain, '.')),
+        ]);
+        foreach ($names as $candidate) {
+            $records = array_merge($records, $provider->listRecords($managed->domain, $candidate));
+        }
 
         foreach ($records as $record) {
             if (!in_array($record['id'] ?? null, $ownedIds, true)) {

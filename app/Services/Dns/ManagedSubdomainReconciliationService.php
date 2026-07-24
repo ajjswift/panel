@@ -13,6 +13,7 @@ use Pterodactyl\Jobs\Dns\SyncManagedSubdomainJob;
 use Pterodactyl\Services\Dns\Results\DnsRecordPlan;
 use Pterodactyl\Jobs\ReverseProxy\SyncNodeReverseProxyJob;
 use Pterodactyl\Exceptions\Service\Dns\DnsProviderException;
+use Pterodactyl\Services\Dns\Results\DetectedAllocationService;
 
 class ManagedSubdomainReconciliationService
 {
@@ -22,6 +23,7 @@ class ManagedSubdomainReconciliationService
         private DnsTargetResolver $targetResolver,
         private DnsRecordPlanner $recordPlanner,
         private DnsProviderFactory $providerFactory,
+        private AllocationServiceDetector $allocationServiceDetector,
     ) {
     }
 
@@ -32,12 +34,12 @@ class ManagedSubdomainReconciliationService
         }
 
         $policy = $this->policyResolver->resolve($server, null, true);
-        ['profile' => $profile, 'source' => $source] = $this->profileResolver->resolve($server);
+        ['profile' => $profile] = $this->profileResolver->resolve($server);
 
         $server->managedSubdomains()
             ->whereNull('deleted_at')
             ->with(['allocation', 'domain', 'records'])
-            ->each(function (ManagedSubdomain $managed) use ($policy, $profile, $source, $checkProvider) {
+            ->each(function (ManagedSubdomain $managed) use ($policy, $profile, $checkProvider) {
                 if (!$managed->allocation || $managed->allocation->server_id !== $managed->server_id) {
                     $managed->forceFill([
                         'status' => ManagedSubdomainStatus::RepairRequired,
@@ -65,11 +67,46 @@ class ManagedSubdomainReconciliationService
                 try {
                     $target = $this->targetResolver->resolve($managed->allocation, $managed->domain);
                     $reverseProxyTarget = $this->targetResolver->resolveForReverseProxy($managed->allocation);
-                    $knownWebScheme = $managed->service_detection_source === 'http_probe'
+                    $sameOrigin = $managed->target_port === $managed->allocation->port;
+                    $knownHttp = $managed->service_detection_source === 'http_probe'
+                        && $sameOrigin
+                        && $reverseProxyTarget?->value === $managed->public_target;
+                    $knownMinecraft = $managed->service_detection_source === 'minecraft_probe'
+                        && $sameOrigin
+                        && $target->value === $managed->public_target;
+                    $detected = $knownHttp
+                        ? new DetectedAllocationService(DetectedAllocationService::HTTP)
+                        : ($knownMinecraft
+                            ? new DetectedAllocationService(DetectedAllocationService::MINECRAFT_JAVA)
+                            : $this->allocationServiceDetector->detect($target, $managed->allocation->port));
+                    if ($detected->isHttp() && !$reverseProxyTarget) {
+                        $managed->forceFill([
+                            'status' => ManagedSubdomainStatus::RepairRequired,
+                            'last_error_code' => 'reverse_proxy_unavailable',
+                            'sanitized_error_message' => 'A website is running on this port, but its node reverse proxy is not available.',
+                        ])->save();
+
+                        return;
+                    }
+                    $srvTarget = $detected->isMinecraftJava()
+                        ? $this->targetResolver->resolveForSrv($managed->allocation)
+                        : null;
+                    if ($detected->isMinecraftJava() && (!$managed->domain->supports_srv || !$srvTarget)) {
+                        $managed->forceFill([
+                            'status' => ManagedSubdomainStatus::RepairRequired,
+                            'last_error_code' => 'srv_unavailable',
+                            'sanitized_error_message' => 'A Minecraft server is running on this port, but an SRV record cannot be safely targeted.',
+                        ])->save();
+
+                        return;
+                    }
+                    $knownWebScheme = $detected->isHttp()
                         && $managed->target_port === $managed->allocation->port
-                        && $reverseProxyTarget?->value === $managed->public_target
                             ? ($managed->desired_record_plan['proxy_target_scheme'] ?? null)
                             : null;
+                    if ($detected->isHttp() && !$knownWebScheme) {
+                        $knownWebScheme = 'http';
+                    }
                     $plan = $this->recordPlanner->build(
                         $managed->fqdn,
                         $managed->allocation,
@@ -78,6 +115,8 @@ class ManagedSubdomainReconciliationService
                         $target,
                         $reverseProxyTarget,
                         $knownWebScheme,
+                        $detected->isMinecraftJava(),
+                        $srvTarget,
                     );
                     $publicTarget = $plan->accessMethod === DnsRecordPlan::ACCESS_PROXY
                         ? ($reverseProxyTarget ?? $target)
@@ -105,13 +144,16 @@ class ManagedSubdomainReconciliationService
                 if ($changed) {
                     $wasProxy = $managed->routing_mode === DnsRoutingMode::ReverseProxy;
                     $detectedByHttpProbe = $plan->webDetectionSource === 'http_probe';
+                    $detectedMinecraft = $plan->minecraftDetected;
                     $managed->forceFill([
                         'dns_service_profile_id' => $profile->id,
                         'routing_mode' => $routingMode,
                         'detected_service' => $detectedByHttpProbe
                             ? sprintf('%s website', strtoupper($plan->proxyTargetScheme ?: 'HTTP'))
-                            : $profile->name,
-                        'service_detection_source' => $detectedByHttpProbe ? 'http_probe' : $source,
+                            : ($detectedMinecraft ? 'Minecraft Java' : $profile->name),
+                        'service_detection_source' => $detectedByHttpProbe
+                            ? 'http_probe'
+                            : ($detectedMinecraft ? 'minecraft_probe' : 'direct_dns_fallback'),
                         'desired_state_version' => $managed->desired_state_version + 1,
                         'public_target_type' => $publicTarget->recordType,
                         'public_target' => $publicTarget->value,

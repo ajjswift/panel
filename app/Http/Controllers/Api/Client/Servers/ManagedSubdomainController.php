@@ -6,6 +6,7 @@ use Pterodactyl\Models\Server;
 use Illuminate\Http\JsonResponse;
 use Pterodactyl\Facades\Activity;
 use Pterodactyl\Models\Allocation;
+use Pterodactyl\Enum\DnsRoutingMode;
 use Illuminate\Support\Facades\Cache;
 use Pterodactyl\Models\ManagedDomain;
 use Pterodactyl\Models\ManagedSubdomain;
@@ -132,6 +133,7 @@ class ManagedSubdomainController extends ClientApiController
             ->transaction(function () use ($managedSubdomain, $allocation, $preview) {
                 $isProxy = ($preview['record_plan']['access_method'] ?? 'clean') === 'proxy';
                 $detectedByHttpProbe = ($preview['record_plan']['web_detection_source'] ?? null) === 'http_probe';
+                $detectedMinecraft = ($preview['record_plan']['minecraft_detected'] ?? false) === true;
                 $detectedScheme = $preview['record_plan']['proxy_target_scheme'] ?? null;
                 $managedSubdomain->forceFill([
                     'allocation_id' => $allocation->id,
@@ -139,10 +141,10 @@ class ManagedSubdomainController extends ClientApiController
                     'routing_mode' => $isProxy ? 'reverse_proxy' : 'direct_dns',
                     'detected_service' => $detectedByHttpProbe
                         ? sprintf('%s website', strtoupper($detectedScheme ?: 'HTTP'))
-                        : $preview['service_profile']['name'],
+                        : ($detectedMinecraft ? 'Minecraft Java' : $preview['service_profile']['name']),
                     'service_detection_source' => $detectedByHttpProbe
                         ? 'http_probe'
-                        : $preview['service_profile']['detection_source'],
+                        : ($detectedMinecraft ? 'minecraft_probe' : 'direct_dns_fallback'),
                     'desired_state_version' => $managedSubdomain->desired_state_version + 1,
                     'public_target_type' => $preview['public_target']['type'],
                     'public_target' => $preview['public_target']['value'],
@@ -188,6 +190,7 @@ class ManagedSubdomainController extends ClientApiController
             throw new DisplayException('This hostname is currently being changed by another request. Try again shortly.');
         }
 
+        $wasProxy = $managedSubdomain->routing_mode === DnsRoutingMode::ReverseProxy;
         try {
             if (ManagedSubdomain::query()->where('fqdn', $preview['fqdn'])->where('id', '!=', $managedSubdomain->id)->exists()) {
                 throw new DisplayException('This hostname is already in use. Choose another name.');
@@ -197,10 +200,25 @@ class ManagedSubdomainController extends ClientApiController
                 ->subject($managedSubdomain)
                 ->property(['old_fqdn' => $managedSubdomain->fqdn, 'new_fqdn' => $preview['fqdn']])
                 ->transaction(function () use ($managedSubdomain, $preview) {
+                    $isProxy = ($preview['record_plan']['access_method'] ?? 'clean') === 'proxy';
+                    $detectedByHttpProbe = ($preview['record_plan']['web_detection_source'] ?? null) === 'http_probe';
+                    $detectedMinecraft = ($preview['record_plan']['minecraft_detected'] ?? false) === true;
+                    $detectedScheme = $preview['record_plan']['proxy_target_scheme'] ?? null;
                     $managedSubdomain->forceFill([
                         'label' => $preview['label'],
                         'fqdn' => $preview['fqdn'],
+                        'dns_service_profile_id' => $preview['service_profile']['id'],
+                        'routing_mode' => $isProxy ? 'reverse_proxy' : 'direct_dns',
+                        'detected_service' => $detectedByHttpProbe
+                            ? sprintf('%s website', strtoupper($detectedScheme ?: 'HTTP'))
+                            : ($detectedMinecraft ? 'Minecraft Java' : $preview['service_profile']['name']),
+                        'service_detection_source' => $detectedByHttpProbe
+                            ? 'http_probe'
+                            : ($detectedMinecraft ? 'minecraft_probe' : 'direct_dns_fallback'),
                         'desired_state_version' => $managedSubdomain->desired_state_version + 1,
+                        'public_target_type' => $preview['public_target']['type'],
+                        'public_target' => $preview['public_target']['value'],
+                        'target_port' => $preview['allocation']['port'],
                         'connection_address' => $preview['record_plan']['connection_address'],
                         'desired_record_plan' => $preview['record_plan'],
                         'status' => 'pending',
@@ -216,6 +234,9 @@ class ManagedSubdomainController extends ClientApiController
         }
 
         SyncManagedSubdomainJob::dispatch($managedSubdomain->id, $managedSubdomain->desired_state_version);
+        if ($wasProxy || $managedSubdomain->routing_mode === DnsRoutingMode::ReverseProxy) {
+            SyncNodeReverseProxyJob::dispatch($server->node_id);
+        }
 
         return $this->fractal->item($managedSubdomain->refresh())
             ->transformWith($this->getTransformer(ManagedSubdomainTransformer::class))

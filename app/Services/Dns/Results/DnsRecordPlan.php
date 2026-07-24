@@ -32,6 +32,7 @@ final readonly class DnsRecordPlan
         public string $friendlyNote = '',
         public ?string $proxyTargetScheme = null,
         public ?string $webDetectionSource = null,
+        public bool $minecraftDetected = false,
     ) {
     }
 
@@ -54,6 +55,9 @@ final readonly class DnsRecordPlan
         }
         if ($this->webDetectionSource) {
             $plan['web_detection_source'] = $this->webDetectionSource;
+        }
+        if ($this->minecraftDetected) {
+            $plan['minecraft_detected'] = true;
         }
 
         return $plan;

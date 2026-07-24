@@ -82,6 +82,29 @@ class DnsTargetResolverTest extends TestCase
         );
     }
 
+    public function testSrvTargetUsesExistingNodeHostnameWithoutCreatingAddressRecord(): void
+    {
+        $node = (new Node())->forceFill([
+            'fqdn' => 'wings.example.net',
+            'dns_target_hostname' => 'games.example.net',
+        ]);
+
+        $this->assertSame(
+            'games.example.net',
+            (new DnsTargetResolver())->resolveForSrv($this->allocation('10.0.0.5', $node)),
+        );
+    }
+
+    public function testSrvTargetFallsBackToNodeFqdnAndRejectsIpOnlyNode(): void
+    {
+        $resolver = new DnsTargetResolver();
+        $node = (new Node())->forceFill(['fqdn' => 'wings.example.net']);
+        $this->assertSame('wings.example.net', $resolver->resolveForSrv($this->allocation('10.0.0.5', $node)));
+
+        $node = (new Node())->forceFill(['fqdn' => '1.1.1.1']);
+        $this->assertNull($resolver->resolveForSrv($this->allocation('10.0.0.5', $node)));
+    }
+
     private function allocation(string $ip, Node $node): Allocation
     {
         return (new Allocation())->forceFill(['ip' => $ip])->setRelation('node', $node);

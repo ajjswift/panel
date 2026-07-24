@@ -72,6 +72,7 @@ class ManagedSubdomainCreationService
 
                     $isProxy = ($preview['record_plan']['access_method'] ?? 'clean') === 'proxy';
                     $detectedByHttpProbe = ($preview['record_plan']['web_detection_source'] ?? null) === 'http_probe';
+                    $detectedMinecraft = ($preview['record_plan']['minecraft_detected'] ?? false) === true;
                     $detectedScheme = $preview['record_plan']['proxy_target_scheme'] ?? null;
 
                     $managed = new ManagedSubdomain();
@@ -87,10 +88,10 @@ class ManagedSubdomainCreationService
                         'routing_mode' => $isProxy ? 'reverse_proxy' : 'direct_dns',
                         'detected_service' => $detectedByHttpProbe
                             ? sprintf('%s website', strtoupper($detectedScheme ?: 'HTTP'))
-                            : $preview['service_profile']['name'],
+                            : ($detectedMinecraft ? 'Minecraft Java' : $preview['service_profile']['name']),
                         'service_detection_source' => $detectedByHttpProbe
                             ? 'http_probe'
-                            : $preview['service_profile']['detection_source'],
+                            : ($detectedMinecraft ? 'minecraft_probe' : 'direct_dns_fallback'),
                         'status' => ManagedSubdomainStatus::Pending,
                         'desired_state_version' => 1,
                         'public_target_type' => $preview['public_target']['type'],

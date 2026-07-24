@@ -11,6 +11,12 @@ return [
         'positive_ttl' => (int) env('MANAGED_DNS_HTTP_POSITIVE_TTL', 300),
         'negative_ttl' => (int) env('MANAGED_DNS_HTTP_NEGATIVE_TTL', 30),
     ],
+    'minecraft_detection' => [
+        'connect_timeout' => (float) env('MANAGED_DNS_MINECRAFT_CONNECT_TIMEOUT', 1),
+        'timeout' => (int) env('MANAGED_DNS_MINECRAFT_TIMEOUT', 2),
+        'positive_ttl' => (int) env('MANAGED_DNS_MINECRAFT_POSITIVE_TTL', 300),
+        'negative_ttl' => (int) env('MANAGED_DNS_MINECRAFT_NEGATIVE_TTL', 30),
+    ],
     'cloudflare' => [
         'base_url' => env('CLOUDFLARE_API_URL', 'https://api.cloudflare.com/client/v4'),
         'timeout' => (int) env('CLOUDFLARE_API_TIMEOUT', 15),

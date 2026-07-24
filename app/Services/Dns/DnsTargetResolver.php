@@ -57,6 +57,24 @@ class DnsTargetResolver
         return new DnsTarget('A', $node->dns_target_ipv4, 'node_reverse_proxy_ipv4');
     }
 
+    /**
+     * Resolve an existing hostname suitable as an SRV target. SRV records
+     * cannot target an IP address, and using the managed hostname itself would
+     * require creating the A record that SRV routing is intended to avoid.
+     */
+    public function resolveForSrv(Allocation $allocation): ?string
+    {
+        $allocation->loadMissing('node');
+
+        foreach ([$allocation->node->dns_target_hostname, $allocation->node->fqdn] as $hostname) {
+            if ($hostname && $this->isSafeHostname($hostname)) {
+                return strtolower(rtrim($hostname, '.'));
+            }
+        }
+
+        return null;
+    }
+
     public function isPublicIp(string $value): bool
     {
         return filter_var(

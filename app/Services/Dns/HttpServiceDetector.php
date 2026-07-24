@@ -23,7 +23,7 @@ class HttpServiceDetector
     /**
      * Returns the origin scheme when the target responds as an HTTP server.
      */
-    public function detect(DnsTarget $target, int $port, string $hostname): ?string
+    public function detect(DnsTarget $target, int $port): ?string
     {
         $key = sprintf(
             'managed-dns:http-service:%s',
@@ -36,7 +36,7 @@ class HttpServiceDetector
             return in_array($cached, ['http', 'https'], true) ? $cached : null;
         }
 
-        $scheme = $this->probe($target->value, $port, $hostname);
+        $scheme = $this->probe($target->value, $port);
         $ttl = $scheme
             ? (int) config('managed-dns.http_detection.positive_ttl', 300)
             : (int) config('managed-dns.http_detection.negative_ttl', 30);
@@ -46,40 +46,37 @@ class HttpServiceDetector
         return $scheme;
     }
 
-    private function probe(string $target, int $port, string $hostname): ?string
+    private function probe(string $target, int $port): ?string
     {
         $host = filter_var($target, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)
             ? sprintf('[%s]', $target)
             : $target;
 
-        foreach (['http', 'https'] as $scheme) {
-            try {
-                // A response with any status code proves that the port speaks
-                // HTTP. Redirects are deliberately not followed because the
-                // origin response is all that matters.
-                $this->http
-                    ->withOptions([
-                        'allow_redirects' => false,
-                        'http_errors' => false,
-                        // Origin services commonly use a self-signed
-                        // certificate; the node proxy will terminate public TLS.
-                        'verify' => false,
-                    ])
-                    ->connectTimeout((float) config('managed-dns.http_detection.connect_timeout', 1))
-                    ->timeout((float) config('managed-dns.http_detection.timeout', 2))
-                    ->withHeaders([
-                        'Host' => $hostname,
-                        'Accept' => 'text/html,application/xhtml+xml,*/*;q=0.8',
-                        'User-Agent' => 'Solstice-HTTP-Service-Detection/1.0',
-                    ])
-                    ->head(sprintf('%s://%s:%d/', $scheme, $host, $port));
+        try {
+            // Match a literal `curl http://host:port/`: use GET, let the target
+            // provide its normal Host handling, and stream the body so a map or
+            // other large page is not downloaded into panel memory.
+            $this->http
+                ->withOptions([
+                    'allow_redirects' => false,
+                    'http_errors' => false,
+                    'stream' => true,
+                ])
+                ->connectTimeout((float) config('managed-dns.http_detection.connect_timeout', 1))
+                ->timeout((float) config('managed-dns.http_detection.timeout', 2))
+                ->withHeaders([
+                    'Accept' => 'text/html,application/xhtml+xml,*/*;q=0.8',
+                    'Range' => 'bytes=0-1023',
+                    'User-Agent' => 'Solstice-HTTP-Service-Detection/1.0',
+                ])
+                ->get(sprintf('http://%s:%d/', $host, $port));
 
-                return $scheme;
-            } catch (\Throwable) {
-                // A connection or protocol failure means this scheme did not
-                // produce an HTTP response. Try the other scheme before giving
-                // up and leaving the allocation on direct DNS.
-            }
+            // A response with any HTTP status proves that this is an HTTP
+            // service; redirects and errors are still valid web responses.
+            return 'http';
+        } catch (\Throwable) {
+            // A connection or protocol failure lets the next detector try the
+            // port before record planning falls back to direct DNS.
         }
 
         return null;

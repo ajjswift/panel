@@ -16,6 +16,8 @@ class ManagedSubdomainPreviewService
         private DnsServiceProfileResolver $profileResolver,
         private DnsTargetResolver $targetResolver,
         private DnsRecordPlanner $recordPlanner,
+        private ManagedHostnameAvailabilityService $availabilityService,
+        private AllocationServiceDetector $allocationServiceDetector,
     ) {
     }
 
@@ -46,6 +48,11 @@ class ManagedSubdomainPreviewService
         $label = $this->normalizeLabel($label);
         $this->validateLabel($domain, $label);
         $fqdn = sprintf('%s.%s', $label, strtolower(rtrim($domain->domain, '.')));
+        if ($requireCreatePermission) {
+            // Provider and panel ownership checks happen before touching the
+            // allocation port, matching the public decision order.
+            $this->availabilityService->assertAvailable($domain, $fqdn);
+        }
 
         ['profile' => $profile, 'source' => $source] = $this->profileResolver->resolve($server);
         if (!$profile) {
@@ -54,7 +61,28 @@ class ManagedSubdomainPreviewService
 
         $target = $this->targetResolver->resolve($allocation, $domain);
         $reverseProxyTarget = $this->targetResolver->resolveForReverseProxy($allocation);
-        $plan = $this->recordPlanner->build($fqdn, $allocation, $domain, $profile, $target, $reverseProxyTarget);
+        $detected = $this->allocationServiceDetector->detect($target, $allocation->port);
+        if ($detected->isHttp() && !$reverseProxyTarget) {
+            throw new DisplayException('A website was detected on this port, but reverse proxying is not configured for its node. Ask an administrator to enable the node reverse proxy first.');
+        }
+        $srvTarget = $detected->isMinecraftJava()
+            ? $this->targetResolver->resolveForSrv($allocation)
+            : null;
+        if ($detected->isMinecraftJava() && (!$domain->supports_srv || !$srvTarget)) {
+            throw new DisplayException('A Minecraft server was detected on this port, but an SRV record cannot be created for this domain and node. Ask an administrator to configure a public node hostname and enable SRV records.');
+        }
+
+        $plan = $this->recordPlanner->build(
+            $fqdn,
+            $allocation,
+            $domain,
+            $profile,
+            $target,
+            $reverseProxyTarget,
+            $detected->isHttp() ? 'http' : null,
+            $detected->isMinecraftJava(),
+            $srvTarget,
+        );
         $publicTarget = $plan->accessMethod === DnsRecordPlan::ACCESS_PROXY
             ? ($reverseProxyTarget ?? $target)
             : $target;
@@ -79,6 +107,7 @@ class ManagedSubdomainPreviewService
                 'detection_source' => $source,
                 'supports_srv' => $profile->supports_srv,
             ],
+            'detected_service' => $detected->type,
             'record_plan' => $plan->toArray(),
         ];
     }
