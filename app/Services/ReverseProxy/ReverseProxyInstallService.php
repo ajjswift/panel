@@ -26,26 +26,34 @@ class ReverseProxyInstallService
             throw new DisplayException('Choose a base domain for this node before generating the install command.');
         }
 
-        $this->keyService->ensure($node);
-        $apiKey = $this->keyService->apiKey($node);
-        $token = $this->keyService->callbackToken($node);
+        $email = config('reverse-proxy.letsencrypt_email');
+        if (!$email) {
+            throw new DisplayException('Set REVERSE_PROXY_LETSENCRYPT_EMAIL in the panel environment before generating the install command; the agent needs it to request certificates.');
+        }
 
-        $args = [
-            '--api-key ' . escapeshellarg($apiKey),
-            '--hostname ' . escapeshellarg($hostname),
-            '--control-port ' . escapeshellarg((string) $node->reverse_proxy_control_port),
-            '--panel-callback-url ' . escapeshellarg(route('api.remote.proxy.status')),
-            '--node-token ' . escapeshellarg($token),
+        $this->keyService->ensure($node);
+
+        // The installer reads its inputs from the environment, and resolves the
+        // correct binary for the node's CPU from the release itself, so we only
+        // supply credentials/config here.
+        $env = [
+            'API_KEY' => $this->keyService->apiKey($node),
+            'HOSTNAME' => $hostname,
+            'CONTROL_PORT' => (string) $node->reverse_proxy_control_port,
+            'PANEL_CALLBACK_URL' => route('api.remote.proxy.status'),
+            'NODE_TOKEN' => $this->keyService->callbackToken($node),
+            'LETSENCRYPT_EMAIL' => $email,
         ];
 
-        if ($email = config('reverse-proxy.letsencrypt_email')) {
-            $args[] = '--email ' . escapeshellarg($email);
+        $assignments = [];
+        foreach ($env as $key => $value) {
+            $assignments[] = $key . '=' . escapeshellarg($value);
         }
 
         return sprintf(
-            'curl -fsSL %s | sudo bash -s -- %s',
+            'curl -fsSL %s | sudo env %s bash',
             escapeshellarg(config('reverse-proxy.installer_url')),
-            implode(' ', $args),
+            implode(' ', $assignments),
         );
     }
 }
