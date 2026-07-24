@@ -7,6 +7,7 @@ use Pterodactyl\Models\Server;
 use Pterodactyl\Models\Allocation;
 use Pterodactyl\Models\ManagedDomain;
 use Pterodactyl\Exceptions\DisplayException;
+use Pterodactyl\Services\Dns\Results\DnsRecordPlan;
 
 class ManagedSubdomainPreviewService
 {
@@ -52,7 +53,11 @@ class ManagedSubdomainPreviewService
         }
 
         $target = $this->targetResolver->resolve($allocation, $domain);
-        $plan = $this->recordPlanner->build($fqdn, $allocation, $domain, $profile, $target);
+        $reverseProxyTarget = $this->targetResolver->resolveForReverseProxy($allocation);
+        $plan = $this->recordPlanner->build($fqdn, $allocation, $domain, $profile, $target, $reverseProxyTarget);
+        $publicTarget = $plan->accessMethod === DnsRecordPlan::ACCESS_PROXY
+            ? ($reverseProxyTarget ?? $target)
+            : $target;
 
         return [
             'label' => $label,
@@ -64,9 +69,9 @@ class ManagedSubdomainPreviewService
                 'display' => sprintf('%s:%d', $allocation->ip_alias ?: $allocation->ip, $allocation->port),
             ],
             'public_target' => [
-                'type' => $target->recordType,
-                'value' => $target->value,
-                'source' => $target->source,
+                'type' => $publicTarget->recordType,
+                'value' => $publicTarget->value,
+                'source' => $publicTarget->source,
             ],
             'service_profile' => [
                 'id' => $profile->id,

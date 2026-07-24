@@ -71,6 +71,8 @@ class ManagedSubdomainCreationService
                     }
 
                     $isProxy = ($preview['record_plan']['access_method'] ?? 'clean') === 'proxy';
+                    $detectedByHttpProbe = ($preview['record_plan']['web_detection_source'] ?? null) === 'http_probe';
+                    $detectedScheme = $preview['record_plan']['proxy_target_scheme'] ?? null;
 
                     $managed = new ManagedSubdomain();
                     $managed->forceFill([
@@ -83,8 +85,12 @@ class ManagedSubdomainCreationService
                         'label' => $preview['label'],
                         'fqdn' => $preview['fqdn'],
                         'routing_mode' => $isProxy ? 'reverse_proxy' : 'direct_dns',
-                        'detected_service' => $preview['service_profile']['name'],
-                        'service_detection_source' => $preview['service_profile']['detection_source'],
+                        'detected_service' => $detectedByHttpProbe
+                            ? sprintf('%s website', strtoupper($detectedScheme ?: 'HTTP'))
+                            : $preview['service_profile']['name'],
+                        'service_detection_source' => $detectedByHttpProbe
+                            ? 'http_probe'
+                            : $preview['service_profile']['detection_source'],
                         'status' => ManagedSubdomainStatus::Pending,
                         'desired_state_version' => 1,
                         'public_target_type' => $preview['public_target']['type'],

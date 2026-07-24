@@ -53,7 +53,7 @@ class ReverseProxyRouteSyncService
                 // The agent forwards to the service running locally on the node.
                 'target_host' => '127.0.0.1',
                 'target_port' => $s->target_port,
-                'target_scheme' => 'http',
+                'target_scheme' => $s->desired_record_plan['proxy_target_scheme'] ?? 'http',
             ])
             ->values()
             ->all();

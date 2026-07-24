@@ -5,10 +5,13 @@ namespace Pterodactyl\Services\Dns;
 use Carbon\Carbon;
 use Pterodactyl\Models\Server;
 use Illuminate\Support\Facades\Log;
+use Pterodactyl\Enum\DnsRoutingMode;
 use Pterodactyl\Models\ManagedDnsRecord;
 use Pterodactyl\Models\ManagedSubdomain;
 use Pterodactyl\Enum\ManagedSubdomainStatus;
 use Pterodactyl\Jobs\Dns\SyncManagedSubdomainJob;
+use Pterodactyl\Services\Dns\Results\DnsRecordPlan;
+use Pterodactyl\Jobs\ReverseProxy\SyncNodeReverseProxyJob;
 use Pterodactyl\Exceptions\Service\Dns\DnsProviderException;
 
 class ManagedSubdomainReconciliationService
@@ -61,13 +64,24 @@ class ManagedSubdomainReconciliationService
 
                 try {
                     $target = $this->targetResolver->resolve($managed->allocation, $managed->domain);
+                    $reverseProxyTarget = $this->targetResolver->resolveForReverseProxy($managed->allocation);
+                    $knownWebScheme = $managed->service_detection_source === 'http_probe'
+                        && $managed->target_port === $managed->allocation->port
+                        && $reverseProxyTarget?->value === $managed->public_target
+                            ? ($managed->desired_record_plan['proxy_target_scheme'] ?? null)
+                            : null;
                     $plan = $this->recordPlanner->build(
                         $managed->fqdn,
                         $managed->allocation,
                         $managed->domain,
                         $profile,
                         $target,
+                        $reverseProxyTarget,
+                        $knownWebScheme,
                     );
+                    $publicTarget = $plan->accessMethod === DnsRecordPlan::ACCESS_PROXY
+                        ? ($reverseProxyTarget ?? $target)
+                        : $target;
                 } catch (\Throwable $exception) {
                     $managed->forceFill([
                         'status' => ManagedSubdomainStatus::RepairRequired,
@@ -78,29 +92,46 @@ class ManagedSubdomainReconciliationService
                     return;
                 }
 
+                $routingMode = $plan->accessMethod === DnsRecordPlan::ACCESS_PROXY
+                    ? DnsRoutingMode::ReverseProxy
+                    : DnsRoutingMode::DirectDns;
                 $changed = $managed->dns_service_profile_id !== $profile->id
-                    || $managed->public_target_type !== $target->recordType
-                    || $managed->public_target !== $target->value
+                    || $managed->routing_mode !== $routingMode
+                    || $managed->public_target_type !== $publicTarget->recordType
+                    || $managed->public_target !== $publicTarget->value
                     || $managed->target_port !== $managed->allocation->port
                     || $managed->desired_record_plan !== $plan->toArray();
 
                 if ($changed) {
+                    $wasProxy = $managed->routing_mode === DnsRoutingMode::ReverseProxy;
+                    $detectedByHttpProbe = $plan->webDetectionSource === 'http_probe';
                     $managed->forceFill([
                         'dns_service_profile_id' => $profile->id,
-                        'detected_service' => $profile->name,
-                        'service_detection_source' => $source,
+                        'routing_mode' => $routingMode,
+                        'detected_service' => $detectedByHttpProbe
+                            ? sprintf('%s website', strtoupper($plan->proxyTargetScheme ?: 'HTTP'))
+                            : $profile->name,
+                        'service_detection_source' => $detectedByHttpProbe ? 'http_probe' : $source,
                         'desired_state_version' => $managed->desired_state_version + 1,
-                        'public_target_type' => $target->recordType,
-                        'public_target' => $target->value,
+                        'public_target_type' => $publicTarget->recordType,
+                        'public_target' => $publicTarget->value,
                         'target_port' => $managed->allocation->port,
                         'connection_address' => $plan->connectionAddress,
                         'desired_record_plan' => $plan->toArray(),
                         'status' => ManagedSubdomainStatus::Pending,
+                        'proxy_dns_status' => null,
+                        'proxy_cert_status' => null,
+                        'proxy_status' => null,
+                        'proxy_cert_expires_at' => null,
+                        'proxy_reported_at' => null,
                         'last_error_code' => null,
                         'sanitized_error_message' => null,
                     ])->save();
 
                     SyncManagedSubdomainJob::dispatch($managed->id, $managed->desired_state_version);
+                    if ($wasProxy || $routingMode === DnsRoutingMode::ReverseProxy) {
+                        SyncNodeReverseProxyJob::dispatch($managed->server->node_id);
+                    }
 
                     return;
                 }

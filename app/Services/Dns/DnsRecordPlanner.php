@@ -10,25 +10,47 @@ use Pterodactyl\Services\Dns\Results\DnsRecordPlan;
 
 class DnsRecordPlanner
 {
+    public function __construct(private ?HttpServiceDetector $httpServiceDetector = null)
+    {
+    }
+
     public function build(
         string $fqdn,
         Allocation $allocation,
         ManagedDomain $domain,
         DnsServiceProfile $profile,
         DnsTarget $target,
+        ?DnsTarget $reverseProxyTarget = null,
+        ?string $knownWebScheme = null,
     ): DnsRecordPlan {
-        $records = [[
-            'key' => 'address',
-            'type' => $target->recordType,
-            'name' => $fqdn,
-            'content' => $target->value,
-            'ttl' => $domain->ttl,
-            'proxied' => false,
-        ]];
+        $protocol = strtolower($profile->protocol);
+        $profileIsWeb = in_array($protocol, ['http', 'https'], true);
+        $knownWebScheme = in_array($knownWebScheme, ['http', 'https'], true) ? $knownWebScheme : null;
+        $detectedWebScheme = $profileIsWeb ? $protocol : $knownWebScheme;
+        $webDetectionSource = $profileIsWeb
+            ? 'service_profile'
+            : ($knownWebScheme ? 'http_probe' : null);
 
-        $useSrv = $profile->supports_srv && $domain->supports_srv;
+        // A server's service profile describes its primary game, not every
+        // allocation attached to it. Probe custom TCP allocations so a web UI
+        // such as a map can override an inherited Minecraft/game profile.
+        if (
+            !$detectedWebScheme
+            && $reverseProxyTarget
+            && $this->httpServiceDetector
+            && $protocol !== 'udp'
+            && !in_array($allocation->port, self::WEB_PORTS, true)
+        ) {
+            $detectedWebScheme = $this->httpServiceDetector->detect($target, $allocation->port, $fqdn);
+            $webDetectionSource = $detectedWebScheme ? 'http_probe' : null;
+        }
+
+        // An HTTP response is stronger evidence for this allocation than the
+        // server-wide game profile, so do not publish an unrelated game SRV
+        // record for the website port.
+        $useSrv = !$detectedWebScheme && $profile->supports_srv && $domain->supports_srv;
         if ($useSrv) {
-            $records[] = [
+            $srvRecord = [
                 'key' => 'srv',
                 'type' => 'SRV',
                 'name' => sprintf('%s.%s.%s', $profile->srv_service, $profile->srv_protocol, $fqdn),
@@ -42,7 +64,8 @@ class DnsRecordPlanner
             ];
         }
 
-        $portlessOnDefault = $profile->portless_on_default_port
+        $portlessOnDefault = !$detectedWebScheme
+            && $profile->portless_on_default_port
             && $profile->default_port
             && $profile->default_port === $allocation->port;
 
@@ -51,10 +74,24 @@ class DnsRecordPlanner
         [$accessMethod, $proxyRequired, $playerAddress, $note] = $this->detectAccess(
             $fqdn,
             $allocation->port,
-            $profile,
             $useSrv,
             $portlessOnDefault,
+            $detectedWebScheme,
+            $reverseProxyTarget !== null,
         );
+
+        $recordTarget = $accessMethod === DnsRecordPlan::ACCESS_PROXY ? ($reverseProxyTarget ?? $target) : $target;
+        $records = [[
+            'key' => 'address',
+            'type' => $recordTarget->recordType,
+            'name' => $fqdn,
+            'content' => $recordTarget->value,
+            'ttl' => $domain->ttl,
+            'proxied' => false,
+        ]];
+        if (isset($srvRecord)) {
+            $records[] = $srvRecord;
+        }
 
         $portDiscoverable = $accessMethod === DnsRecordPlan::ACCESS_CLEAN;
         $connectionAddress = $playerAddress;
@@ -75,6 +112,8 @@ class DnsRecordPlanner
             proxyRequired: $proxyRequired,
             playerAddress: $playerAddress,
             friendlyNote: $note,
+            proxyTargetScheme: $accessMethod === DnsRecordPlan::ACCESS_PROXY ? $detectedWebScheme : null,
+            webDetectionSource: $webDetectionSource,
         );
     }
 
@@ -105,39 +144,47 @@ class DnsRecordPlanner
     private function detectAccess(
         string $fqdn,
         int $port,
-        DnsServiceProfile $profile,
         bool $useSrv,
         bool $portlessOnDefault,
+        ?string $detectedWebScheme,
+        bool $reverseProxyAvailable,
     ): array {
-        $protocol = strtolower($profile->protocol);
-        $isWeb = in_array($protocol, ['http', 'https'], true);
+        $isWeb = $detectedWebScheme !== null;
 
         // A well-known port the client assumes automatically, or an SRV-aware
         // game, or a service on its own default port: the plain address works.
-        if (in_array($port, self::CLIENT_ASSUMED_PORTS, true) || $useSrv || $portlessOnDefault) {
+        if (
+            ($isWeb && in_array($port, self::WEB_PORTS, true))
+            || (!$isWeb && (in_array($port, self::CLIENT_ASSUMED_PORTS, true) || $useSrv || $portlessOnDefault))
+        ) {
             return [
                 DnsRecordPlan::ACCESS_CLEAN,
                 false,
                 $fqdn,
                 $isWeb && in_array($port, self::WEB_PORTS, true)
-                    ? sprintf('Your site will be reachable at %s.', $fqdn)
+                    ? sprintf('Your site will be reachable at https://%s.', $fqdn)
                     : sprintf('Players just enter %s — no port needed.', $fqdn),
             ];
         }
 
         // A website on a custom port needs a reverse proxy to drop the ":port"
-        // from the address. Until that add-on is available, the address with the
-        // port still works in a browser.
-        if ($isWeb) {
+        // from the public address. Use it automatically when this node has a
+        // configured agent and public proxy target.
+        if ($isWeb && $reverseProxyAvailable) {
             return [
                 DnsRecordPlan::ACCESS_PROXY,
                 true,
+                $fqdn,
+                sprintf('A website was detected on port %d. It will be securely available at https://%s with no port needed.', $port, $fqdn),
+            ];
+        }
+
+        if ($isWeb) {
+            return [
+                DnsRecordPlan::ACCESS_WITH_PORT,
+                true,
                 sprintf('%s:%d', $fqdn, $port),
-                sprintf(
-                    'This is a website on a custom port. Visitors can use %s:%d right away. A proxy add-on (coming soon) would give a clean address with no port.',
-                    $fqdn,
-                    $port,
-                ),
+                sprintf('This is a website on a custom port. Visitors use %s:%d because this node does not have reverse proxying available.', $fqdn, $port),
             ];
         }
 
@@ -146,7 +193,7 @@ class DnsRecordPlanner
             DnsRecordPlan::ACCESS_WITH_PORT,
             false,
             sprintf('%s:%d', $fqdn, $port),
-            sprintf('Players connect using %s:%d (include the number after the colon).', $fqdn, $port),
+            sprintf('Players connect using %s:%d (include the number after the colon; DNS cannot redirect arbitrary ports).', $fqdn, $port),
         ];
     }
 }

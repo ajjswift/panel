@@ -41,6 +41,22 @@ class DnsTargetResolver
         throw new DisplayException('No safe public DNS target is configured for this allocation.');
     }
 
+    /**
+     * Resolve the public address of the reverse-proxy agent on this allocation's
+     * node. A null result means this node cannot currently host proxy routes.
+     */
+    public function resolveForReverseProxy(Allocation $allocation): ?DnsTarget
+    {
+        $allocation->loadMissing('node');
+        $node = $allocation->node;
+
+        if (!$node->reverse_proxy_enabled || !$node->dns_target_ipv4 || !$this->isPublicIp($node->dns_target_ipv4)) {
+            return null;
+        }
+
+        return new DnsTarget('A', $node->dns_target_ipv4, 'node_reverse_proxy_ipv4');
+    }
+
     public function isPublicIp(string $value): bool
     {
         return filter_var(

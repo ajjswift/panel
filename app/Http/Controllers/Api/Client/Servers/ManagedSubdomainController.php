@@ -11,10 +11,12 @@ use Pterodactyl\Models\ManagedDomain;
 use Pterodactyl\Models\ManagedSubdomain;
 use Pterodactyl\Exceptions\DisplayException;
 use Pterodactyl\Models\ManagedDnsSyncAttempt;
+use Pterodactyl\Services\Dns\DnsTargetResolver;
 use Pterodactyl\Jobs\Dns\SyncManagedSubdomainJob;
 use Pterodactyl\Jobs\Dns\DeleteManagedSubdomainJob;
 use Pterodactyl\Jobs\Dns\RefreshManagedSubdomainJob;
 use Pterodactyl\Services\Dns\SubdomainPolicyResolver;
+use Pterodactyl\Jobs\ReverseProxy\SyncNodeReverseProxyJob;
 use Pterodactyl\Services\Dns\ManagedSubdomainPreviewService;
 use Pterodactyl\Services\Dns\ManagedSubdomainCreationService;
 use Pterodactyl\Http\Controllers\Api\Client\ClientApiController;
@@ -34,6 +36,7 @@ class ManagedSubdomainController extends ClientApiController
 {
     public function __construct(
         private SubdomainPolicyResolver $policyResolver,
+        private DnsTargetResolver $targetResolver,
         private ManagedSubdomainPreviewService $previewService,
         private ManagedSubdomainCreationService $creationService,
     ) {
@@ -66,7 +69,9 @@ class ManagedSubdomainController extends ClientApiController
             'attention_count' => $policy->canView ? (clone $hostnames)->whereNotIn('status', ['active', 'pending', 'creating', 'updating'])->count() : null,
             'dns_health' => $policy->canView ? ((clone $hostnames)->whereNotIn('status', ['active'])->exists() ? 'attention' : 'healthy') : null,
             'active_game_slot' => $server->activeGameSlot()->value('name'),
-            'reverse_proxy_available' => false,
+            'reverse_proxy_available' => $server->node->reverse_proxy_enabled
+                && $server->node->dns_target_ipv4
+                && $this->targetResolver->isPublicIp($server->node->dns_target_ipv4),
         ];
     }
 
@@ -125,11 +130,19 @@ class ManagedSubdomainController extends ClientApiController
                 'new_allocation_id' => $allocation->id,
             ])
             ->transaction(function () use ($managedSubdomain, $allocation, $preview) {
+                $isProxy = ($preview['record_plan']['access_method'] ?? 'clean') === 'proxy';
+                $detectedByHttpProbe = ($preview['record_plan']['web_detection_source'] ?? null) === 'http_probe';
+                $detectedScheme = $preview['record_plan']['proxy_target_scheme'] ?? null;
                 $managedSubdomain->forceFill([
                     'allocation_id' => $allocation->id,
                     'dns_service_profile_id' => $preview['service_profile']['id'],
-                    'detected_service' => $preview['service_profile']['name'],
-                    'service_detection_source' => $preview['service_profile']['detection_source'],
+                    'routing_mode' => $isProxy ? 'reverse_proxy' : 'direct_dns',
+                    'detected_service' => $detectedByHttpProbe
+                        ? sprintf('%s website', strtoupper($detectedScheme ?: 'HTTP'))
+                        : $preview['service_profile']['name'],
+                    'service_detection_source' => $detectedByHttpProbe
+                        ? 'http_probe'
+                        : $preview['service_profile']['detection_source'],
                     'desired_state_version' => $managedSubdomain->desired_state_version + 1,
                     'public_target_type' => $preview['public_target']['type'],
                     'public_target' => $preview['public_target']['value'],
@@ -137,10 +150,16 @@ class ManagedSubdomainController extends ClientApiController
                     'connection_address' => $preview['record_plan']['connection_address'],
                     'desired_record_plan' => $preview['record_plan'],
                     'status' => 'pending',
+                    'proxy_dns_status' => null,
+                    'proxy_cert_status' => null,
+                    'proxy_status' => null,
+                    'proxy_cert_expires_at' => null,
+                    'proxy_reported_at' => null,
                 ])->saveOrFail();
             });
 
         SyncManagedSubdomainJob::dispatch($managedSubdomain->id, $managedSubdomain->desired_state_version);
+        SyncNodeReverseProxyJob::dispatch($server->node_id);
 
         return $this->fractal->item($managedSubdomain->refresh())
             ->transformWith($this->getTransformer(ManagedSubdomainTransformer::class))
@@ -185,6 +204,11 @@ class ManagedSubdomainController extends ClientApiController
                         'connection_address' => $preview['record_plan']['connection_address'],
                         'desired_record_plan' => $preview['record_plan'],
                         'status' => 'pending',
+                        'proxy_dns_status' => null,
+                        'proxy_cert_status' => null,
+                        'proxy_status' => null,
+                        'proxy_cert_expires_at' => null,
+                        'proxy_reported_at' => null,
                     ])->saveOrFail();
                 });
         } finally {

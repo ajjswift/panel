@@ -30,12 +30,14 @@ final readonly class DnsRecordPlan
         public bool $proxyRequired = false,
         public string $playerAddress = '',
         public string $friendlyNote = '',
+        public ?string $proxyTargetScheme = null,
+        public ?string $webDetectionSource = null,
     ) {
     }
 
     public function toArray(): array
     {
-        return [
+        $plan = [
             'records' => $this->records,
             'connection_address' => $this->connectionAddress,
             'port_discoverable' => $this->portDiscoverable,
@@ -46,5 +48,14 @@ final readonly class DnsRecordPlan
             'player_address' => $this->playerAddress ?: $this->connectionAddress,
             'friendly_note' => $this->friendlyNote,
         ];
+
+        if ($this->proxyTargetScheme) {
+            $plan['proxy_target_scheme'] = $this->proxyTargetScheme;
+        }
+        if ($this->webDetectionSource) {
+            $plan['web_detection_source'] = $this->webDetectionSource;
+        }
+
+        return $plan;
     }
 }

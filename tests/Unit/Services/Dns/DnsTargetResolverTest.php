@@ -55,6 +55,33 @@ class DnsTargetResolverTest extends TestCase
         $this->assertTrue($resolver->isSafeHostname('games.example.net'));
     }
 
+    public function testReverseProxyTargetUsesEnabledNodesPublicAddress(): void
+    {
+        $node = (new Node())->forceFill([
+            'reverse_proxy_enabled' => true,
+            'dns_target_ipv4' => '1.1.1.1',
+        ]);
+
+        $target = (new DnsTargetResolver())->resolveForReverseProxy($this->allocation('10.0.0.5', $node));
+
+        $this->assertNotNull($target);
+        $this->assertSame('A', $target->recordType);
+        $this->assertSame('1.1.1.1', $target->value);
+        $this->assertSame('node_reverse_proxy_ipv4', $target->source);
+    }
+
+    public function testReverseProxyTargetRejectsDisabledNode(): void
+    {
+        $node = (new Node())->forceFill([
+            'reverse_proxy_enabled' => false,
+            'dns_target_ipv4' => '1.1.1.1',
+        ]);
+
+        $this->assertNull(
+            (new DnsTargetResolver())->resolveForReverseProxy($this->allocation('10.0.0.5', $node))
+        );
+    }
+
     private function allocation(string $ip, Node $node): Allocation
     {
         return (new Allocation())->forceFill(['ip' => $ip])->setRelation('node', $node);
