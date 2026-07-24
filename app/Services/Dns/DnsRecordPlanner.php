@@ -45,30 +45,108 @@ class DnsRecordPlanner
         $portlessOnDefault = $profile->portless_on_default_port
             && $profile->default_port
             && $profile->default_port === $allocation->port;
-        $portDiscoverable = $useSrv || $portlessOnDefault;
-        $connectionAddress = $portDiscoverable ? $fqdn : sprintf('%s:%d', $fqdn, $allocation->port);
 
-        $explanation = $useSrv
-            ? sprintf(
-                '%s detected. An SRV record will direct compatible clients from %s to port %d.',
-                $profile->name,
-                $fqdn,
-                $allocation->port,
-            )
-            : ($portlessOnDefault
-                ? sprintf('%s uses its expected default port, so players can connect with %s.', $profile->name, $fqdn)
-                : sprintf(
-                    'DNS will resolve %s to this server, but it cannot redirect arbitrary ports. Players must connect using %s.',
-                    $fqdn,
-                    $connectionAddress,
-                ));
+        // Work out how a visitor actually reaches the server, and whether a
+        // reverse proxy would be needed to make the address clean.
+        [$accessMethod, $proxyRequired, $playerAddress, $note] = $this->detectAccess(
+            $fqdn,
+            $allocation->port,
+            $profile,
+            $useSrv,
+            $portlessOnDefault,
+        );
+
+        $portDiscoverable = $accessMethod === DnsRecordPlan::ACCESS_CLEAN;
+        $connectionAddress = $playerAddress;
+
+        // Keep the older technical explanation around for compatibility, but the
+        // client now leans on the friendly note instead.
+        $explanation = $note;
 
         return new DnsRecordPlan(
             records: $records,
             connectionAddress: $connectionAddress,
             portDiscoverable: $portDiscoverable,
             explanation: $explanation,
-            warnings: $portDiscoverable ? [] : ['Players must include the selected port when connecting.'],
+            warnings: $accessMethod === DnsRecordPlan::ACCESS_WITH_PORT
+                ? ['Players need to include the number after the colon when they connect.']
+                : [],
+            accessMethod: $accessMethod,
+            proxyRequired: $proxyRequired,
+            playerAddress: $playerAddress,
+            friendlyNote: $note,
         );
+    }
+
+    /**
+     * Ports where the game/service client automatically assumes the port, so a
+     * plain address (with just a DNS record) is enough — no proxy, no SRV, no
+     * ":port". This is what lets detection "just work" for a given port even
+     * when an egg has not been mapped to a service profile.
+     */
+    private const CLIENT_ASSUMED_PORTS = [
+        25565, // Minecraft: Java Edition
+        19132, // Minecraft: Bedrock Edition
+        80,    // HTTP (browsers default to 80)
+        443,   // HTTPS (browsers default to 443)
+    ];
+
+    /**
+     * Standard web ports handled cleanly by any browser.
+     */
+    private const WEB_PORTS = [80, 443];
+
+    /**
+     * Automatically classify how a given port is reached and whether it needs a
+     * reverse proxy or a plain DNS record.
+     *
+     * @return array{0: string, 1: bool, 2: string, 3: string}
+     */
+    private function detectAccess(
+        string $fqdn,
+        int $port,
+        DnsServiceProfile $profile,
+        bool $useSrv,
+        bool $portlessOnDefault,
+    ): array {
+        $protocol = strtolower($profile->protocol);
+        $isWeb = in_array($protocol, ['http', 'https'], true);
+
+        // A well-known port the client assumes automatically, or an SRV-aware
+        // game, or a service on its own default port: the plain address works.
+        if (in_array($port, self::CLIENT_ASSUMED_PORTS, true) || $useSrv || $portlessOnDefault) {
+            return [
+                DnsRecordPlan::ACCESS_CLEAN,
+                false,
+                $fqdn,
+                $isWeb && in_array($port, self::WEB_PORTS, true)
+                    ? sprintf('Your site will be reachable at %s.', $fqdn)
+                    : sprintf('Players just enter %s — no port needed.', $fqdn),
+            ];
+        }
+
+        // A website on a custom port needs a reverse proxy to drop the ":port"
+        // from the address. Until that add-on is available, the address with the
+        // port still works in a browser.
+        if ($isWeb) {
+            return [
+                DnsRecordPlan::ACCESS_PROXY,
+                true,
+                sprintf('%s:%d', $fqdn, $port),
+                sprintf(
+                    'This is a website on a custom port. Visitors can use %s:%d right away. A proxy add-on (coming soon) would give a clean address with no port.',
+                    $fqdn,
+                    $port,
+                ),
+            ];
+        }
+
+        // Everything else works over plain DNS, but the port has to be typed.
+        return [
+            DnsRecordPlan::ACCESS_WITH_PORT,
+            false,
+            sprintf('%s:%d', $fqdn, $port),
+            sprintf('Players connect using %s:%d (include the number after the colon).', $fqdn, $port),
+        ];
     }
 }

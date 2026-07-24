@@ -43,12 +43,18 @@ export interface NetworkOverview {
     reverseProxyAvailable: boolean;
 }
 
+export type AccessMethod = 'clean' | 'with_port' | 'proxy';
+
 export interface DnsRecordPreview {
     records: Array<Record<string, string | number | boolean>>;
     connectionAddress: string;
     portDiscoverable: boolean;
     explanation: string;
     warnings: string[];
+    accessMethod: AccessMethod;
+    proxyRequired: boolean;
+    playerAddress: string;
+    friendlyNote: string;
 }
 
 export interface ManagedSubdomainPreview {
@@ -82,6 +88,25 @@ export interface ManagedSubdomain {
     createdAt: string;
     updatedAt: string;
 }
+
+// Maps the backend record plan, falling back gracefully for rows created
+// before automatic access detection existed.
+const recordPlan = (plan: any): DnsRecordPreview => {
+    const connectionAddress = plan.connection_address;
+    const portDiscoverable = !!plan.port_discoverable;
+
+    return {
+        records: plan.records || [],
+        connectionAddress,
+        portDiscoverable,
+        explanation: plan.explanation || '',
+        warnings: plan.warnings || [],
+        accessMethod: plan.access_method || (portDiscoverable ? 'clean' : 'with_port'),
+        proxyRequired: !!plan.proxy_required,
+        playerAddress: plan.player_address || connectionAddress,
+        friendlyNote: plan.friendly_note || plan.explanation || '',
+    };
+};
 
 const policy = (data: any): SubdomainPolicy => ({
     enabled: data.enabled,
@@ -123,13 +148,7 @@ const subdomain = ({ attributes: data }: FractalResponseData): ManagedSubdomain 
     connectionAddress: data.connection_address,
     publicTarget: data.public_target,
     targetPort: data.target_port,
-    recordPlan: {
-        records: data.record_plan.records,
-        connectionAddress: data.record_plan.connection_address,
-        portDiscoverable: data.record_plan.port_discoverable,
-        explanation: data.record_plan.explanation,
-        warnings: data.record_plan.warnings || [],
-    },
+    recordPlan: recordPlan(data.record_plan),
     recordCount: data.record_count,
     lastSynchronizedAt: data.last_synchronized_at,
     lastErrorCode: data.last_error_code,
@@ -181,13 +200,7 @@ export const previewManagedSubdomain = async (
             detectionSource: data.service_profile.detection_source,
             supportsSrv: data.service_profile.supports_srv,
         },
-        recordPlan: {
-            records: data.record_plan.records,
-            connectionAddress: data.record_plan.connection_address,
-            portDiscoverable: data.record_plan.port_discoverable,
-            explanation: data.record_plan.explanation,
-            warnings: data.record_plan.warnings || [],
-        },
+        recordPlan: recordPlan(data.record_plan),
     };
 };
 

@@ -1,12 +1,15 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import useSWR from 'swr';
-import tw from 'twin.macro';
-import Modal from '@/components/elements/Modal';
-import Button from '@/components/elements/Button';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faPlus, faGlobe, faCopy, faCheck, faCircleNotch, faPen, faTrashAlt } from '@fortawesome/free-solid-svg-icons';
+import classNames from 'classnames';
+import { Dialog } from '@/components/elements/dialog';
+import { Button } from '@/components/elements/button/index';
 import Input from '@/components/elements/Input';
 import Select from '@/components/elements/Select';
+import Label from '@/components/elements/Label';
 import Spinner from '@/components/elements/Spinner';
-import Can from '@/components/elements/Can';
+import CopyOnClick from '@/components/elements/CopyOnClick';
 import { ServerContext } from '@/state/server';
 import useFlash, { useFlashKey } from '@/plugins/useFlash';
 import {
@@ -18,197 +21,232 @@ import {
     ManagedSubdomainPreview,
     previewManagedSubdomain,
     reassignManagedSubdomain,
-    refreshManagedSubdomain,
     repairManagedSubdomain,
     updateManagedSubdomain,
 } from '@/api/server/network/managedSubdomains';
 
-const workingStatuses = ['pending', 'creating', 'updating', 'deleting'];
+const settingUp = ['pending', 'creating', 'updating'];
 
-const statusTone = (status: string) => {
-    if (status === 'active') return tw`bg-green-900 text-green-200 border-green-700`;
-    if (workingStatuses.includes(status)) return tw`bg-blue-900 text-blue-200 border-blue-700`;
-    return tw`bg-yellow-900 text-yellow-100 border-yellow-700`;
+// Translate a raw backend status into plain-language state a non-technical
+// player understands. Never relies on color alone — each state has a label.
+const friendlyStatus = (status: string): { label: string; tone: 'ok' | 'busy' | 'attention'; hint: string } => {
+    if (status === 'active') return { label: 'Ready', tone: 'ok', hint: '' };
+    if (settingUp.includes(status)) return { label: 'Setting up…', tone: 'busy', hint: 'This usually takes under a minute.' };
+    if (status === 'deleting') return { label: 'Removing…', tone: 'busy', hint: '' };
+    return { label: 'Needs attention', tone: 'attention', hint: '' };
 };
 
-const CreateSubdomainModal = ({
-    visible,
-    onDismissed,
-    onCreated,
-}: {
-    visible: boolean;
-    onDismissed: () => void;
-    onCreated: (subdomain: ManagedSubdomain) => void;
-}) => {
+const toneChip: Record<'ok' | 'busy' | 'attention', string> = {
+    ok: 'bg-success/10 text-success-text',
+    busy: 'bg-primary-500/10 text-primary-400',
+    attention: 'bg-warning/10 text-warning-text',
+};
+
+// Clean what the user types into a valid DNS label as they go.
+const sanitizeLabel = (value: string): string =>
+    value
+        .toLowerCase()
+        .replace(/[^a-z0-9-]/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-/, '')
+        .slice(0, 63);
+
+interface AddressForm {
+    open: boolean;
+    editing?: ManagedSubdomain | null;
+    onClose: () => void;
+    onSaved: () => void;
+}
+
+const AddressFormDialog = ({ open, editing, onClose, onSaved }: AddressForm) => {
     const uuid = ServerContext.useStoreState((state) => state.server.data!.uuid);
     const allocations = ServerContext.useStoreState((state) => state.server.data!.allocations);
     const { clearAndAddHttpError, clearFlashes } = useFlashKey('server:network');
     const { data: overview } = useSWR(['server:network-overview', uuid], () => getNetworkOverview(uuid), {
         revalidateOnFocus: false,
     });
-    const [label, setLabel] = useState('');
+
+    const domains = overview?.policy.eligibleDomains || [];
+    const [name, setName] = useState('');
     const [domainUuid, setDomainUuid] = useState('');
     const [allocationId, setAllocationId] = useState<number>(allocations[0]?.id || 0);
     const [preview, setPreview] = useState<ManagedSubdomainPreview | null>(null);
-    const [loading, setLoading] = useState(false);
+    const [previewing, setPreviewing] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const previewTimer = useRef<number>();
+
+    // Seed the form when it opens.
+    useEffect(() => {
+        if (!open) return;
+        setName(editing?.label ?? '');
+        setAllocationId(editing?.allocation?.id ?? allocations[0]?.id ?? 0);
+        setDomainUuid(editing?.domain.uuid ?? domains[0]?.uuid ?? '');
+        setPreview(null);
+    }, [open]);
 
     useEffect(() => {
-        if (!domainUuid && overview?.policy.eligibleDomains[0]) {
-            setDomainUuid(overview.policy.eligibleDomains[0].uuid);
-        }
-    }, [overview, domainUuid]);
+        if (!domainUuid && domains[0]) setDomainUuid(domains[0].uuid);
+    }, [domains, domainUuid]);
 
-    const values = { label, domainUuid, allocationId };
-    const canSubmit = !!label.trim() && !!domainUuid && !!allocationId;
+    const label = sanitizeLabel(name);
+    const suffix = domains.find((d) => d.uuid === domainUuid)?.domain || '';
 
-    const runPreview = () => {
+    // Live preview: quietly ask the backend what the address will look like.
+    useEffect(() => {
+        window.clearTimeout(previewTimer.current);
+        setPreview(null);
+        if (!open || !label || !domainUuid || !allocationId) return;
+
+        previewTimer.current = window.setTimeout(() => {
+            setPreviewing(true);
+            previewManagedSubdomain(uuid, { label, domainUuid, allocationId })
+                .then(setPreview)
+                .catch(() => setPreview(null))
+                .then(() => setPreviewing(false));
+        }, 500);
+
+        return () => window.clearTimeout(previewTimer.current);
+    }, [label, domainUuid, allocationId, open]);
+
+    const submit = () => {
         clearFlashes();
-        setLoading(true);
-        previewManagedSubdomain(uuid, values)
-            .then(setPreview)
-            .catch((error) => clearAndAddHttpError(error))
-            .then(() => setLoading(false));
-    };
+        setSaving(true);
+        const request = editing
+            ? Promise.all([
+                  editing.label !== label ? updateManagedSubdomain(uuid, editing.uuid, label) : Promise.resolve(),
+                  editing.allocation?.id !== allocationId
+                      ? reassignManagedSubdomain(uuid, editing.uuid, allocationId)
+                      : Promise.resolve(),
+              ])
+            : createManagedSubdomain(uuid, { label, domainUuid, allocationId });
 
-    const create = () => {
-        clearFlashes();
-        setLoading(true);
-        createManagedSubdomain(uuid, values)
-            .then((record) => {
-                onCreated(record);
-                setLabel('');
-                setPreview(null);
-                onDismissed();
+        Promise.resolve(request)
+            .then(() => {
+                onSaved();
+                onClose();
             })
             .catch((error) => clearAndAddHttpError(error))
-            .then(() => setLoading(false));
+            .then(() => setSaving(false));
     };
 
+    const canSubmit = !!label && !!domainUuid && !!allocationId && !saving;
+
     return (
-        <Modal visible={visible} onDismissed={onDismissed} showSpinnerOverlay={loading}>
-            <div role={'dialog'} aria-modal={'true'} aria-labelledby={'create-managed-hostname-title'}>
-                <h2 id={'create-managed-hostname-title'} css={tw`text-xl text-neutral-100 font-semibold`}>
-                    Create managed hostname
-                </h2>
-                <p css={tw`text-sm text-neutral-300 mt-1`}>
-                    Select an existing allocation. This workflow will not change the server&apos;s allocations.
+        <Dialog
+            open={open}
+            onClose={onClose}
+            title={editing ? 'Edit address' : 'Add an address'}
+            description={
+                editing
+                    ? 'Change the name players use to reach your server.'
+                    : 'Give your server a friendly address instead of a number.'
+            }
+        >
+            {domains.length === 0 ? (
+                <p className={'text-sm text-body-muted'}>
+                    No domains are available for your server yet. Ask your host to add one.
                 </p>
-                <div css={tw`grid gap-4 mt-5 sm:grid-cols-2`}>
-                    <label css={tw`block text-sm text-neutral-200`}>
-                        Label
-                        <Input
-                            css={tw`mt-1`}
-                            value={label}
-                            maxLength={63}
-                            placeholder={'play'}
-                            onChange={(event) => {
-                                setLabel(event.currentTarget.value);
-                                setPreview(null);
-                            }}
-                        />
-                    </label>
-                    <label css={tw`block text-sm text-neutral-200`}>
-                        Parent domain
-                        <Select
-                            css={tw`mt-1`}
-                            value={domainUuid}
-                            onChange={(event) => {
-                                setDomainUuid(event.currentTarget.value);
-                                setPreview(null);
-                            }}
-                        >
-                            {(overview?.policy.eligibleDomains || []).map((domain) => (
-                                <option key={domain.uuid} value={domain.uuid}>
-                                    {domain.domain}
-                                </option>
-                            ))}
-                        </Select>
-                    </label>
-                    <label css={tw`block text-sm text-neutral-200 sm:col-span-2`}>
-                        Existing server allocation
-                        <Select
-                            css={tw`mt-1`}
-                            value={allocationId}
-                            onChange={(event) => {
-                                setAllocationId(Number(event.currentTarget.value));
-                                setPreview(null);
-                            }}
-                        >
-                            {allocations.map((allocation) => (
-                                <option key={allocation.id} value={allocation.id}>
-                                    {allocation.alias || allocation.ip}:{allocation.port}
-                                    {allocation.isDefault ? ' — primary' : ''}
-                                </option>
-                            ))}
-                        </Select>
-                    </label>
-                </div>
-
-                {preview && (
-                    <div css={tw`mt-5 rounded-lg border border-primary-700 bg-neutral-800 p-4`}>
-                        <div css={tw`grid gap-3 sm:grid-cols-2`}>
-                            <div>
-                                <p css={tw`text-xs uppercase text-neutral-400`}>Hostname</p>
-                                <p css={tw`text-neutral-100 break-all`}>{preview.fqdn}</p>
-                            </div>
-                            <div>
-                                <p css={tw`text-xs uppercase text-neutral-400`}>Player connection address</p>
-                                <p css={tw`text-neutral-100 break-all`}>{preview.recordPlan.connectionAddress}</p>
-                            </div>
-                            <div>
-                                <p css={tw`text-xs uppercase text-neutral-400`}>Active service</p>
-                                <p css={tw`text-neutral-100`}>{preview.serviceProfile.name}</p>
-                            </div>
-                            <div>
-                                <p css={tw`text-xs uppercase text-neutral-400`}>Public DNS target</p>
-                                <p css={tw`text-neutral-100 break-all`}>
-                                    {preview.publicTarget.type} {preview.publicTarget.value}
-                                </p>
-                            </div>
-                        </div>
-                        <p css={tw`text-sm text-neutral-200 mt-4`}>{preview.recordPlan.explanation}</p>
-                        <div css={tw`mt-3 space-y-2`}>
-                            {preview.recordPlan.records.map((record, index) => (
-                                <div
-                                    key={`${record.type}-${record.name}-${index}`}
-                                    css={tw`text-xs font-mono text-neutral-300`}
+            ) : (
+                <div className={'space-y-4'}>
+                    <div>
+                        <Label>Choose a name</Label>
+                        <div className={'flex items-stretch gap-2'}>
+                            <Input
+                                value={name}
+                                autoFocus
+                                maxLength={63}
+                                placeholder={'myserver'}
+                                onChange={(e) => setName(e.currentTarget.value)}
+                                className={'flex-1'}
+                            />
+                            {domains.length > 1 ? (
+                                <Select
+                                    value={domainUuid}
+                                    onChange={(e) => setDomainUuid(e.currentTarget.value)}
+                                    className={'w-auto'}
                                 >
-                                    {String(record.type)} {String(record.name)}
-                                    {record.content ? ` → ${String(record.content)}` : ''}
-                                    {record.port ? ` → ${String(record.target)}:${String(record.port)}` : ''}
-                                </div>
-                            ))}
+                                    {domains.map((d) => (
+                                        <option key={d.uuid} value={d.uuid}>
+                                            .{d.domain}
+                                        </option>
+                                    ))}
+                                </Select>
+                            ) : (
+                                <span className={'flex items-center px-3 text-sm text-body-muted whitespace-nowrap'}>
+                                    .{suffix}
+                                </span>
+                            )}
                         </div>
+                        {label && (
+                            <p className={'text-xs text-body-muted mt-1.5'}>
+                                Your address will be{' '}
+                                <span className={'font-medium text-body'}>
+                                    {label}.{suffix}
+                                </span>
+                            </p>
+                        )}
                     </div>
-                )}
 
-                <div css={tw`mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end`}>
-                    <Button type={'button'} color={'grey'} isSecondary onClick={onDismissed}>
-                        Cancel
-                    </Button>
-                    {!preview ? (
-                        <Button type={'button'} disabled={!canSubmit} onClick={runPreview}>
-                            Preview DNS records
-                        </Button>
-                    ) : (
-                        <Button type={'button'} disabled={!canSubmit} onClick={create}>
-                            Confirm and create
-                        </Button>
+                    {allocations.length > 1 && (
+                        <div>
+                            <Label>Which port?</Label>
+                            <Select
+                                value={allocationId}
+                                onChange={(e) => setAllocationId(Number(e.currentTarget.value))}
+                            >
+                                {allocations.map((a) => (
+                                    <option key={a.id} value={a.id}>
+                                        Port {a.port}
+                                        {a.isDefault ? ' (main)' : ''}
+                                    </option>
+                                ))}
+                            </Select>
+                        </div>
                     )}
+
+                    <div className={'min-h-[3.5rem] rounded-md border border-line bg-page px-3 py-2.5'}>
+                        {previewing ? (
+                            <p className={'text-sm text-body-muted flex items-center gap-2'}>
+                                <FontAwesomeIcon icon={faCircleNotch} spin className={'w-3.5 h-3.5'} />
+                                Checking…
+                            </p>
+                        ) : preview ? (
+                            <>
+                                <p className={'text-sm text-body'}>
+                                    Players connect with{' '}
+                                    <span className={'font-semibold'}>{preview.recordPlan.playerAddress}</span>
+                                </p>
+                                <p className={'text-xs text-body-muted mt-0.5'}>{preview.recordPlan.friendlyNote}</p>
+                            </>
+                        ) : (
+                            <p className={'text-sm text-body-muted'}>Type a name to see your address.</p>
+                        )}
+                    </div>
                 </div>
-            </div>
-        </Modal>
+            )}
+
+            <Dialog.Footer>
+                <Button.Text onClick={onClose} disabled={saving}>
+                    Cancel
+                </Button.Text>
+                <Button onClick={submit} disabled={!canSubmit || domains.length === 0}>
+                    {editing ? 'Save' : 'Create address'}
+                </Button>
+            </Dialog.Footer>
+        </Dialog>
     );
 };
 
 const SubdomainsSection = () => {
     const uuid = ServerContext.useStoreState((state) => state.server.data!.uuid);
-    const allocations = ServerContext.useStoreState((state) => state.server.data!.allocations);
     const { clearAndAddHttpError, clearFlashes } = useFlashKey('server:network');
     const { addFlash } = useFlash();
-    const lastStates = useRef<Record<string, { fqdn: string; status: string }>>({});
-    const [creating, setCreating] = useState(false);
+    const lastStates = useRef<Record<string, string>>({});
+    const [formOpen, setFormOpen] = useState(false);
+    const [editing, setEditing] = useState<ManagedSubdomain | null>(null);
+    const [confirmDelete, setConfirmDelete] = useState<ManagedSubdomain | null>(null);
     const [busy, setBusy] = useState<string | null>(null);
+
     const overview = useSWR(['server:network-overview', uuid], () => getNetworkOverview(uuid), {
         revalidateOnFocus: false,
     });
@@ -216,8 +254,8 @@ const SubdomainsSection = () => {
         revalidateOnFocus: false,
     });
 
-    const hasWorkingRecord = useMemo(
-        () => (records.data || []).some((record) => workingStatuses.includes(record.status)),
+    const hasBusy = useMemo(
+        () => (records.data || []).some((r) => [...settingUp, 'deleting'].includes(r.status)),
         [records.data]
     );
 
@@ -225,96 +263,54 @@ const SubdomainsSection = () => {
         clearAndAddHttpError(overview.error || records.error);
     }, [overview.error, records.error]);
 
+    // Poll while something is setting up so the state updates on its own.
     useEffect(() => {
-        if (!hasWorkingRecord) return;
+        if (!hasBusy) return;
         const timer = window.setInterval(() => {
             records.mutate();
             overview.mutate();
         }, 3000);
-
         return () => window.clearInterval(timer);
-    }, [hasWorkingRecord, uuid]);
+    }, [hasBusy, uuid]);
 
+    // Friendly toasts as addresses come online or need attention.
     useEffect(() => {
         if (!records.data) return;
-        const previous = lastStates.current;
-        const next: Record<string, { fqdn: string; status: string }> = {};
-        records.data.forEach((record) => {
-            next[record.uuid] = { fqdn: record.fqdn, status: record.status };
-            const old = previous[record.uuid];
-            if (old && workingStatuses.includes(old.status) && record.status === 'active') {
-                addFlash({
-                    key: 'server:network',
-                    type: 'success',
-                    title: 'DNS synchronized',
-                    message: `${record.fqdn} is active.`,
-                });
-            } else if (
-                old &&
-                workingStatuses.includes(old.status) &&
-                ['failed', 'repair_required'].includes(record.status)
-            ) {
+        const prev = lastStates.current;
+        const next: Record<string, string> = {};
+        records.data.forEach((r) => {
+            next[r.uuid] = r.status;
+            const was = prev[r.uuid];
+            if (was && settingUp.includes(was) && r.status === 'active') {
+                addFlash({ key: 'server:network', type: 'success', title: 'Address ready', message: `${r.fqdn} is live.` });
+            } else if (was && settingUp.includes(was) && friendlyStatus(r.status).tone === 'attention') {
                 addFlash({
                     key: 'server:network',
                     type: 'error',
-                    title: 'DNS needs attention',
-                    message: record.errorMessage || `${record.fqdn} could not be synchronized.`,
-                });
-            } else if (
-                old?.status === 'active' &&
-                ['incompatible', 'restricted', 'over_limit'].includes(record.status)
-            ) {
-                addFlash({
-                    key: 'server:network',
-                    type: 'warning',
-                    title: 'Managed hostname changed',
-                    message: record.errorMessage || `${record.fqdn} now needs administrator attention.`,
-                });
-            }
-        });
-        Object.entries(previous).forEach(([id, record]) => {
-            if (record.status === 'deleting' && !next[id]) {
-                addFlash({
-                    key: 'server:network',
-                    type: 'success',
-                    title: 'Hostname deleted',
-                    message: `${record.fqdn} and its owned DNS records were removed.`,
+                    title: 'Address needs attention',
+                    message: r.errorMessage || `${r.fqdn} could not be set up.`,
                 });
             }
         });
         lastStates.current = next;
     }, [records.data]);
 
-    const action = (record: ManagedSubdomain, operation: 'repair' | 'refresh' | 'delete') => {
-        if (operation === 'delete' && !window.confirm(`Delete ${record.fqdn} and its owned DNS records?`)) return;
+    const remove = (record: ManagedSubdomain) => {
         clearFlashes();
         setBusy(record.uuid);
-        const request =
-            operation === 'delete'
-                ? deleteManagedSubdomain(uuid, record.uuid)
-                : operation === 'repair'
-                ? repairManagedSubdomain(uuid, record.uuid)
-                : refreshManagedSubdomain(uuid, record.uuid);
-        request
+        deleteManagedSubdomain(uuid, record.uuid)
             .then(() => records.mutate())
             .catch((error) => clearAndAddHttpError(error))
-            .then(() => setBusy(null));
+            .then(() => {
+                setBusy(null);
+                setConfirmDelete(null);
+            });
     };
 
-    const reassign = (record: ManagedSubdomain, allocationId: number) => {
-        if (allocationId === record.allocation?.id) return;
+    const retry = (record: ManagedSubdomain) => {
+        clearFlashes();
         setBusy(record.uuid);
-        reassignManagedSubdomain(uuid, record.uuid, allocationId)
-            .then(() => records.mutate())
-            .catch((error) => clearAndAddHttpError(error))
-            .then(() => setBusy(null));
-    };
-
-    const rename = (record: ManagedSubdomain) => {
-        const label = window.prompt('Enter the new hostname label', record.label)?.trim();
-        if (!label || label === record.label) return;
-        setBusy(record.uuid);
-        updateManagedSubdomain(uuid, record.uuid, label)
+        repairManagedSubdomain(uuid, record.uuid)
             .then(() => records.mutate())
             .catch((error) => clearAndAddHttpError(error))
             .then(() => setBusy(null));
@@ -324,167 +320,167 @@ const SubdomainsSection = () => {
     const policy = overview.data.policy;
 
     return (
-        <section aria-labelledby={'network-subdomains-title'}>
-            <CreateSubdomainModal
-                visible={creating}
-                onDismissed={() => setCreating(false)}
-                onCreated={(record) => records.mutate([record, ...(records.data || [])], false)}
+        <section aria-labelledby={'domains-title'}>
+            <AddressFormDialog
+                open={formOpen}
+                editing={editing}
+                onClose={() => {
+                    setFormOpen(false);
+                    setEditing(null);
+                }}
+                onSaved={() => {
+                    records.mutate();
+                    overview.mutate();
+                }}
             />
-            <div css={tw`sm:flex sm:items-start sm:justify-between mb-5`}>
+
+            <Dialog.Confirm
+                open={!!confirmDelete}
+                onClose={() => setConfirmDelete(null)}
+                title={'Remove this address?'}
+                confirm={'Remove address'}
+                onConfirmed={() => confirmDelete && remove(confirmDelete)}
+            >
+                Players will no longer be able to use{' '}
+                <span className={'font-semibold text-body'}>{confirmDelete?.fqdn}</span>. Your server and its port are
+                not affected.
+            </Dialog.Confirm>
+
+            <div className={'flex items-start justify-between gap-3 mb-5'}>
                 <div>
-                    <h2 id={'network-subdomains-title'} css={tw`text-xl text-neutral-100 font-semibold`}>
-                        Managed subdomains
+                    <h2 id={'domains-title'} className={'text-xl font-semibold text-body'}>
+                        Domains
                     </h2>
-                    <p css={tw`text-sm text-neutral-300 mt-1`}>
-                        {policy.used} of {policy.limit} hostnames used. DNS changes synchronize in the background.
+                    <p className={'text-sm text-body-muted mt-1'}>
+                        Give your server a friendly address players can remember, instead of an IP and port.
+                        {policy.limit > 0 && ` ${policy.used} of ${policy.limit} used.`}
                     </p>
                 </div>
                 {policy.canCreate && (
-                    <Button css={tw`mt-4 w-full sm:mt-0 sm:w-auto`} onClick={() => setCreating(true)}>
-                        Create hostname
+                    <Button className={'shrink-0'} onClick={() => setFormOpen(true)}>
+                        <FontAwesomeIcon icon={faPlus} className={'w-3.5 h-3.5 mr-2'} />
+                        Add address
                     </Button>
                 )}
             </div>
 
             {!policy.canCreate && policy.disabledReason && (
-                <div role={'status'} css={tw`rounded border border-yellow-700 bg-yellow-900 bg-opacity-20 p-4 mb-4`}>
-                    <p css={tw`text-yellow-100 font-medium`}>Creation unavailable</p>
-                    <p css={tw`text-sm text-neutral-200 mt-1`}>{policy.disabledReason}</p>
+                <div
+                    role={'status'}
+                    className={'rounded-md border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-warning-text mb-4'}
+                >
+                    {policy.disabledReason}
                 </div>
             )}
 
             {records.data.length === 0 ? (
-                <div css={tw`rounded-lg border border-dashed border-neutral-500 p-8 text-center`}>
-                    <p css={tw`text-neutral-200 font-medium`}>No managed hostnames</p>
-                    <p css={tw`text-sm text-neutral-400 mt-1`}>
-                        Create one to connect an approved hostname to an allocation already assigned to this server.
+                <div className={'rounded-lg border border-dashed border-line-strong p-10 text-center'}>
+                    <FontAwesomeIcon icon={faGlobe} className={'w-8 h-8 text-body-faint mb-3'} />
+                    <p className={'text-body font-medium'}>No addresses yet</p>
+                    <p className={'text-sm text-body-muted mt-1 max-w-md mx-auto'}>
+                        Add one to turn a hard-to-remember IP and port into something like{' '}
+                        <span className={'font-medium text-body'}>play.yourname.com</span>.
                     </p>
+                    {policy.canCreate && (
+                        <Button className={'mt-4'} onClick={() => setFormOpen(true)}>
+                            <FontAwesomeIcon icon={faPlus} className={'w-3.5 h-3.5 mr-2'} />
+                            Add address
+                        </Button>
+                    )}
                 </div>
             ) : (
-                <div css={tw`space-y-4`}>
-                    {records.data.map((record) => (
-                        <article key={record.uuid} css={tw`rounded-lg border border-neutral-600 bg-neutral-700 p-4`}>
-                            <div css={tw`flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between`}>
-                                <div css={tw`min-w-0`}>
-                                    <div css={tw`flex flex-wrap items-center gap-2`}>
-                                        <h3 css={tw`text-neutral-100 font-semibold break-all`}>{record.fqdn}</h3>
-                                        <span
-                                            css={[
-                                                tw`border rounded px-2 py-0.5 text-xs capitalize`,
-                                                statusTone(record.status),
-                                            ]}
-                                        >
-                                            {record.status.replace(/_/g, ' ')}
-                                        </span>
-                                    </div>
-                                    <p css={tw`text-sm text-neutral-300 mt-1`}>
-                                        Connect with{' '}
-                                        <span css={tw`font-mono text-neutral-100`}>{record.connectionAddress}</span>
-                                    </p>
-                                    <p css={tw`text-xs text-neutral-400 mt-1`}>
-                                        {record.detectedService} · {record.recordPlan.explanation}
-                                    </p>
-                                </div>
-                                <div css={tw`text-xs text-neutral-400 sm:text-right`}>
-                                    <p>{record.recordCount} owned DNS record(s)</p>
-                                    <p>
-                                        {record.lastSynchronizedAt
-                                            ? 'Last synchronized'
-                                            : 'Awaiting first synchronization'}
-                                    </p>
-                                </div>
-                            </div>
+                <div className={'space-y-3'}>
+                    {records.data.map((record) => {
+                        const state = friendlyStatus(record.status);
+                        const rowBusy = busy === record.uuid;
 
-                            {record.errorMessage && (
-                                <p
-                                    role={'alert'}
-                                    css={tw`mt-3 rounded border border-yellow-700 p-3 text-sm text-yellow-100`}
-                                >
-                                    {record.errorMessage}
-                                </p>
-                            )}
-
-                            <div css={tw`mt-4 grid gap-3 md:grid-cols-2`}>
-                                <Can
-                                    action={'subdomain.reassign'}
-                                    renderOnError={
-                                        <div css={tw`text-xs text-neutral-300`}>
-                                            Target allocation
-                                            <p css={tw`mt-2 text-sm text-neutral-100`}>
-                                                {record.allocation
-                                                    ? `${record.allocation.alias || record.allocation.ip}:${
-                                                          record.allocation.port
-                                                      }`
-                                                    : 'Allocation missing'}
-                                            </p>
+                        return (
+                            <article key={record.uuid} className={'rounded-lg border border-line bg-surface p-4'}>
+                                <div className={'flex flex-wrap items-start justify-between gap-3'}>
+                                    <div className={'min-w-0'}>
+                                        <div className={'flex items-center gap-2 flex-wrap'}>
+                                            <h3 className={'text-body font-semibold break-all'}>{record.fqdn}</h3>
+                                            <span
+                                                className={classNames(
+                                                    'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-semibold uppercase tracking-wide',
+                                                    toneChip[state.tone]
+                                                )}
+                                            >
+                                                {state.tone === 'busy' && (
+                                                    <FontAwesomeIcon icon={faCircleNotch} spin className={'w-2.5 h-2.5'} />
+                                                )}
+                                                {state.label}
+                                            </span>
                                         </div>
-                                    }
-                                >
-                                    <label css={tw`text-xs text-neutral-300`}>
-                                        Target allocation
-                                        <Select
-                                            css={tw`mt-1`}
-                                            disabled={busy === record.uuid || workingStatuses.includes(record.status)}
-                                            value={record.allocation?.id || ''}
-                                            onChange={(event) => reassign(record, Number(event.currentTarget.value))}
-                                        >
-                                            {allocations.map((allocation) => (
-                                                <option key={allocation.id} value={allocation.id}>
-                                                    {allocation.alias || allocation.ip}:{allocation.port}
-                                                </option>
-                                            ))}
-                                        </Select>
-                                    </label>
-                                </Can>
-                                <div css={tw`flex flex-wrap gap-2 items-end md:justify-end`}>
-                                    {policy.canUpdate && (
-                                        <Button
-                                            size={'xsmall'}
-                                            color={'grey'}
-                                            isSecondary
-                                            disabled={busy === record.uuid || workingStatuses.includes(record.status)}
-                                            onClick={() => rename(record)}
-                                        >
-                                            Edit label
-                                        </Button>
-                                    )}
-                                    <Can action={'subdomain.refresh'}>
-                                        <Button
-                                            size={'xsmall'}
-                                            color={'grey'}
-                                            isSecondary
-                                            disabled={busy === record.uuid}
-                                            onClick={() => action(record, 'refresh')}
-                                        >
-                                            Check DNS
-                                        </Button>
-                                    </Can>
-                                    {policy.canRepair && record.status !== 'active' && (
-                                        <Button
-                                            size={'xsmall'}
-                                            color={'primary'}
-                                            isSecondary
-                                            disabled={busy === record.uuid}
-                                            onClick={() => action(record, 'repair')}
-                                        >
-                                            Repair DNS
-                                        </Button>
-                                    )}
-                                    {policy.canDelete && (
-                                        <Button
-                                            size={'xsmall'}
-                                            color={'red'}
-                                            isSecondary
-                                            disabled={busy === record.uuid}
-                                            onClick={() => action(record, 'delete')}
-                                        >
-                                            Delete
-                                        </Button>
-                                    )}
+                                        {record.status === 'active' ? (
+                                            <p className={'text-sm text-body-muted mt-1'}>
+                                                Players connect with{' '}
+                                                <CopyOnClick text={record.connectionAddress}>
+                                                    <button
+                                                        className={
+                                                            'font-medium text-body hover:text-primary-400 transition-colors'
+                                                        }
+                                                    >
+                                                        {record.connectionAddress}
+                                                        <FontAwesomeIcon icon={faCopy} className={'w-3 h-3 ml-1.5'} />
+                                                    </button>
+                                                </CopyOnClick>
+                                            </p>
+                                        ) : (
+                                            <p className={'text-sm text-body-muted mt-1'}>
+                                                {record.errorMessage || state.hint}
+                                            </p>
+                                        )}
+                                    </div>
+
+                                    <div className={'flex items-center gap-1.5 shrink-0'}>
+                                        {state.tone === 'attention' && policy.canRepair && (
+                                            <Button.Text
+                                                size={Button.Sizes.Small}
+                                                disabled={rowBusy}
+                                                onClick={() => retry(record)}
+                                            >
+                                                {rowBusy ? (
+                                                    <FontAwesomeIcon icon={faCircleNotch} spin className={'w-3.5 h-3.5'} />
+                                                ) : (
+                                                    <>
+                                                        <FontAwesomeIcon icon={faCheck} className={'w-3.5 h-3.5 mr-1.5'} />
+                                                        Try again
+                                                    </>
+                                                )}
+                                            </Button.Text>
+                                        )}
+                                        {policy.canUpdate && !settingUp.includes(record.status) && (
+                                            <Button.Text
+                                                size={Button.Sizes.Small}
+                                                shape={Button.Shapes.IconSquare}
+                                                aria-label={`Edit ${record.fqdn}`}
+                                                disabled={rowBusy}
+                                                onClick={() => {
+                                                    setEditing(record);
+                                                    setFormOpen(true);
+                                                }}
+                                            >
+                                                <FontAwesomeIcon icon={faPen} className={'w-3.5 h-3.5'} />
+                                            </Button.Text>
+                                        )}
+                                        {policy.canDelete && (
+                                            <Button.Danger
+                                                size={Button.Sizes.Small}
+                                                shape={Button.Shapes.IconSquare}
+                                                variant={Button.Variants.Secondary}
+                                                aria-label={`Remove ${record.fqdn}`}
+                                                disabled={rowBusy || record.status === 'deleting'}
+                                                onClick={() => setConfirmDelete(record)}
+                                            >
+                                                <FontAwesomeIcon icon={faTrashAlt} className={'w-3.5 h-3.5'} />
+                                            </Button.Danger>
+                                        )}
+                                    </div>
                                 </div>
-                            </div>
-                        </article>
-                    ))}
+                            </article>
+                        );
+                    })}
                 </div>
             )}
         </section>

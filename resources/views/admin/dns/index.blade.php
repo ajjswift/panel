@@ -1,29 +1,38 @@
 @extends('layouts.admin')
 
-@section('title', 'Managed DNS')
+@section('title', 'Domains')
 
 @section('content-header')
-    <h1>Managed DNS<small>Approved parent domains and reusable service behavior.</small></h1>
+    <h1>Domains<small>Let customers give their servers friendly addresses.</small></h1>
 @endsection
 
 @section('content')
 <div class="row">
     <div class="col-xs-12">
         <div class="box">
-            <div class="box-header with-border"><h3 class="box-title">Approved parent domains</h3></div>
+            <div class="box-header with-border"><h3 class="box-title">Connected domains</h3></div>
             <div class="box-body table-responsive no-padding">
                 <table class="table table-hover">
-                    <tr><th>Domain</th><th>Provider health</th><th>Hostnames</th><th>Status</th><th></th></tr>
+                    <tr><th>Domain</th><th>Status</th><th>Addresses in use</th><th></th></tr>
                     @forelse($domains as $domain)
                         <tr>
                             <td><strong>{{ $domain->name }}</strong><br><code>{{ $domain->domain }}</code></td>
-                            <td>{{ $domain->last_provider_status ?? 'Not tested' }}</td>
+                            <td>
+                                @if(!$domain->enabled)
+                                    <span class="label label-default">Off</span>
+                                @elseif($domain->last_provider_status === 'healthy')
+                                    <span class="label label-success">Working</span>
+                                @elseif($domain->last_provider_status)
+                                    <span class="label label-danger">Needs attention</span>
+                                @else
+                                    <span class="label label-warning">Not tested</span>
+                                @endif
+                            </td>
                             <td>{{ $domain->managed_subdomains_count }}</td>
-                            <td>{{ $domain->enabled ? 'Enabled' : 'Disabled' }}</td>
-                            <td class="text-right"><a class="btn btn-xs btn-primary" href="{{ route('admin.managed-dns.edit', $domain) }}">Configure</a></td>
+                            <td class="text-right"><a class="btn btn-xs btn-primary" href="{{ route('admin.managed-dns.edit', $domain) }}">Manage</a></td>
                         </tr>
                     @empty
-                        <tr><td colspan="5" class="text-center text-muted">No parent domains are configured.</td></tr>
+                        <tr><td colspan="4" class="text-center text-muted">No domains connected yet. Add one below.</td></tr>
                     @endforelse
                 </table>
             </div>
@@ -33,83 +42,61 @@
         </div>
     </div>
 
-    <div class="col-md-7">
+    <div class="col-md-8 col-md-offset-2">
         <form id="managedDomainCreateForm" action="{{ route('admin.managed-dns.store') }}" method="POST">
             @csrf
             <div class="box box-primary">
-                <div class="box-header with-border"><h3 class="box-title">Add Cloudflare parent domain</h3></div>
+                <div class="box-header with-border"><h3 class="box-title">Add a domain</h3></div>
                 <div class="box-body">
+                    <p class="text-muted" style="margin-top:-4px">
+                        Connect a domain you own in Cloudflare. Customers can then create addresses like
+                        <code>play.yourdomain.com</code> for their servers.
+                    </p>
                     <div class="row">
-                        <div class="form-group col-md-6"><label>Display name</label><input name="name" class="form-control" required></div>
-                        <div class="form-group col-md-6"><label>Root domain</label><input id="managedDomainName" name="domain" class="form-control" placeholder="example.com" required></div>
                         <div class="form-group col-md-6">
-                            <label>Cloudflare zone ID</label>
-                            <div class="input-group">
-                                <input id="managedDomainZoneId" name="zone_id" class="form-control" required>
-                                <span class="input-group-btn">
-                                    <button id="discoverCloudflareZone" type="button" class="btn btn-default">
-                                        <i class="fa fa-cloud"></i> Find zone &amp; verify
-                                    </button>
-                                </span>
-                            </div>
+                            <label>Name</label>
+                            <input name="name" class="form-control" placeholder="e.g. Community Domains" required>
                         </div>
-                        <div class="form-group col-md-6"><label>Scoped API token</label><input id="managedDomainApiToken" name="api_token" type="password" autocomplete="new-password" class="form-control" required></div>
+                        <div class="form-group col-md-6">
+                            <label>Domain</label>
+                            <input id="managedDomainName" name="domain" class="form-control" placeholder="yourdomain.com" required>
+                        </div>
+                        <div class="form-group col-md-8">
+                            <label>Cloudflare API token</label>
+                            <input id="managedDomainApiToken" name="api_token" type="password" autocomplete="new-password" class="form-control" placeholder="Token with DNS edit access" required>
+                        </div>
+                        <div class="form-group col-md-4">
+                            <label>&nbsp;</label>
+                            <button id="discoverCloudflareZone" type="button" class="btn btn-default btn-block">
+                                <i class="fa fa-cloud"></i> Connect
+                            </button>
+                        </div>
                         <div class="col-xs-12">
                             <p id="cloudflareDiscoveryStatus" class="help-block">
-                                The token needs Zone:Read and DNS:Edit for this zone. Verification briefly creates, updates, and removes a TXT record; it does not create zones or change nameservers.
+                                The token needs DNS edit access for this domain. We check the connection without changing your site or nameservers.
                             </p>
                         </div>
-                        <div class="form-group col-md-6"><label>Default TTL</label><input name="ttl" type="number" min="60" value="300" class="form-control" required></div>
-                        <div class="form-group col-md-6"><label>Label pattern</label><input name="label_pattern" value="^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$" class="form-control" required></div>
-                        <div class="form-group col-xs-12"><label>Reserved labels</label><textarea name="reserved_labels" class="form-control" placeholder="www, mail, api, admin, panel, status"></textarea></div>
-                        <div class="form-group col-xs-12"><label>Description</label><textarea name="description" class="form-control"></textarea></div>
                     </div>
-                    <input type="hidden" name="supports_direct_dns" value="1">
-                    <input type="hidden" name="supports_srv" value="1">
-                </div>
-                <div class="box-footer"><button class="btn btn-primary pull-right">Save disabled domain</button></div>
-            </div>
-        </form>
-    </div>
 
-    <div class="col-md-5">
-        <form action="{{ route('admin.managed-dns.profiles.store') }}" method="POST">
-            @csrf
-            <div class="box">
-                <div class="box-header with-border"><h3 class="box-title">Add service profile</h3></div>
-                <div class="box-body">
-                    <div class="form-group"><label>Name</label><input name="name" class="form-control" required></div>
-                    <div class="form-group"><label>Slug</label><input name="slug" class="form-control" required></div>
-                    <div class="row">
-                        <div class="form-group col-xs-6"><label>Protocol</label><select name="protocol" class="form-control"><option>tcp</option><option>udp</option><option>http</option><option>https</option></select></div>
-                        <div class="form-group col-xs-6"><label>Default port</label><input name="default_port" type="number" class="form-control"></div>
-                    </div>
-                    <div class="checkbox"><label><input type="checkbox" name="supports_direct_dns" value="1" checked> Direct DNS supported</label></div>
-                    <div class="checkbox"><label><input type="checkbox" name="supports_srv" value="1"> SRV supported</label></div>
-                    <div class="row">
-                        <div class="form-group col-xs-6"><label>SRV service</label><input name="srv_service" placeholder="_minecraft" class="form-control"></div>
-                        <div class="form-group col-xs-6"><label>SRV protocol</label><select name="srv_protocol" class="form-control"><option value="">None</option><option>_tcp</option><option>_udp</option></select></div>
-                        <input type="hidden" name="srv_priority" value="0"><input type="hidden" name="srv_weight" value="5">
-                    </div>
-                    <div class="checkbox"><label><input type="checkbox" name="portless_on_default_port" value="1" checked> Hostname alone works on the default port</label></div>
-                    <div class="form-group"><label>Description</label><textarea name="description" class="form-control"></textarea></div>
-                </div>
-                <div class="box-footer"><button class="btn btn-primary pull-right">Create profile</button></div>
-            </div>
-        </form>
+                    <input type="hidden" id="managedDomainZoneId" name="zone_id" value="">
 
-        <div class="box">
-            <div class="box-header with-border"><h3 class="box-title">Service profiles</h3></div>
-            <div class="box-body">
-                @foreach($profiles as $profile)
-                    <p><strong>{{ $profile->name }}</strong> <span class="label label-default">{{ $profile->protocol }}</span>
-                        @if($profile->supports_srv)<span class="label label-info">SRV</span>@endif<br>
-                        <small class="text-muted">{{ $profile->description }}</small><br>
-                        <a href="{{ route('admin.managed-dns.profiles.edit', $profile) }}">Configure profile</a>
+                    <div class="form-group" id="enableRow" style="display:none">
+                        <div class="checkbox checkbox-primary no-margin-bottom">
+                            <input id="managedDomainEnabled" type="checkbox" name="enabled" value="1">
+                            <label for="managedDomainEnabled" class="strong">Make available to customers right away</label>
+                        </div>
+                    </div>
+                    <p>
+                        <a href="#" id="manualZoneToggle" class="text-muted small">Enter zone ID manually instead</a>
                     </p>
-                @endforeach
+                    <div class="form-group" id="manualZoneRow" style="display:none">
+                        <label>Cloudflare zone ID</label>
+                        <input type="text" class="form-control" oninput="document.getElementById('managedDomainZoneId').value = this.value">
+                    </div>
+                </div>
+                <div class="box-footer"><button class="btn btn-primary pull-right">Save</button></div>
             </div>
-        </div>
+        </form>
     </div>
 </div>
 @endsection
@@ -121,48 +108,42 @@
             var $button = $('#discoverCloudflareZone');
             var $status = $('#cloudflareDiscoveryStatus');
 
+            $('#manualZoneToggle').on('click', function (e) {
+                e.preventDefault();
+                $('#manualZoneRow, #enableRow').show();
+                $(this).hide();
+            });
+
             $button.on('click', function () {
                 var domain = $.trim($('#managedDomainName').val());
                 var token = $('#managedDomainApiToken').val();
 
                 if (!domain || !token) {
-                    $status.removeClass('text-success').addClass('text-danger').text('Enter the root domain and scoped API token first.');
+                    $status.removeClass('text-success').addClass('text-danger').text('Enter the domain and Cloudflare API token first.');
                     return;
                 }
 
-                $button.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Verifying...');
-                $status.removeClass('text-success text-danger').text('Looking up the active Cloudflare zone and checking DNS permissions...');
+                $button.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Connecting...');
+                $status.removeClass('text-success text-danger').text('Checking the connection to Cloudflare...');
 
                 $.ajax({
                     method: 'POST',
                     url: '{{ route('admin.managed-dns.discover') }}',
-                    data: {
-                        _token: '{{ csrf_token() }}',
-                        domain: domain,
-                        api_token: token
-                    }
+                    data: { _token: '{{ csrf_token() }}', domain: domain, api_token: token }
                 }).done(function (response) {
                     $('#managedDomainZoneId').val(response.zone_id);
-                    $status.removeClass('text-danger').addClass('text-success').text(
-                        'Found ' + response.zone_name + ' and verified DNS read, create, update, and delete access.'
-                    );
+                    $('#enableRow').show();
+                    $status.removeClass('text-danger').addClass('text-success').text('Connected to ' + response.zone_name + '. You can save now.');
                 }).fail(function (jqXHR) {
-                    var message = 'Cloudflare configuration could not be verified.';
-
+                    var message = 'We could not connect to Cloudflare with those details.';
                     if (jqXHR.responseJSON && jqXHR.responseJSON.message) {
                         message = jqXHR.responseJSON.message;
-                    } else if (
-                        jqXHR.responseJSON &&
-                        jqXHR.responseJSON.errors &&
-                        jqXHR.responseJSON.errors[0] &&
-                        jqXHR.responseJSON.errors[0].detail
-                    ) {
+                    } else if (jqXHR.responseJSON && jqXHR.responseJSON.errors && jqXHR.responseJSON.errors[0]) {
                         message = jqXHR.responseJSON.errors[0].detail;
                     }
-
                     $status.removeClass('text-success').addClass('text-danger').text(message);
                 }).always(function () {
-                    $button.prop('disabled', false).html('<i class="fa fa-cloud"></i> Find zone &amp; verify');
+                    $button.prop('disabled', false).html('<i class="fa fa-cloud"></i> Connect');
                 });
             });
         });

@@ -164,7 +164,7 @@ export default {
             component: NetworkContainer,
         },
         {
-            path: '/network/:section(allocations|subdomains|routing)',
+            path: '/network/:section(allocations|domains|subdomains|routing)',
             permission: ['allocation.*', 'subdomain.*'],
             name: undefined,
             component: NetworkContainer,

@@ -161,15 +161,43 @@ a:focus {
 }
 
 /* ------------------------------------------------------- forms & inputs */
-.form-control {
+.form-control,
+input.form-control,
+select.form-control,
+textarea.form-control {
     border-radius: 8px;
-    border-color: #d5d9e6;
+    border: 1px solid #d5d9e6;
+    background-color: #fff;
     color: var(--sol-text);
+    box-shadow: none;
 }
 
-.form-control:focus {
+.form-control::placeholder,
+input.form-control::placeholder,
+textarea.form-control::placeholder {
+    color: #98a0b8;
+}
+
+.form-control:focus,
+input.form-control:focus,
+select.form-control:focus,
+textarea.form-control:focus {
     border-color: var(--sol-purple);
     box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.25);
+}
+
+/* Select2 widgets used on some admin forms. */
+.select2-container--default .select2-selection--multiple,
+.select2-container--default .select2-selection--single {
+    border-radius: 8px;
+    border-color: #d5d9e6;
+    background-color: #fff;
+}
+
+.input-group-addon {
+    background-color: #f2f3f9;
+    border-color: #d5d9e6;
+    color: var(--sol-muted);
 }
 
 label {

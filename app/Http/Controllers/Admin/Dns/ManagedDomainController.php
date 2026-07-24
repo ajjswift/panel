@@ -202,8 +202,13 @@ class ManagedDomainController extends Controller
         $data = $request->validated();
         $data['domain'] = strtolower(rtrim($data['domain'], '.'));
         $data['enabled'] = $request->boolean('enabled');
-        $data['supports_srv'] = $request->boolean('supports_srv');
-        $data['supports_direct_dns'] = $request->boolean('supports_direct_dns');
+        // Sensible defaults so the "add domain" form can stay simple. SRV and
+        // direct DNS are always supported; the panel auto-detects per address
+        // which one a given port needs.
+        $data['supports_srv'] = $request->has('supports_srv') ? $request->boolean('supports_srv') : true;
+        $data['supports_direct_dns'] = $request->has('supports_direct_dns') ? $request->boolean('supports_direct_dns') : true;
+        $data['ttl'] = $data['ttl'] ?? 300;
+        $data['label_pattern'] = $data['label_pattern'] ?: '^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$';
         $data['reserved_labels'] = collect(preg_split('/[\s,]+/', $data['reserved_labels'] ?? ''))
             ->filter()
             ->map(fn ($label) => strtolower($label))

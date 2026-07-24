@@ -104,7 +104,7 @@
                         </li>
                         <li class="{{ ! starts_with(Route::currentRouteName(), 'admin.managed-dns') ?: 'active' }}">
                             <a href="{{ route('admin.managed-dns') }}">
-                                <i class="fa fa-cloud"></i> <span>Managed DNS</span>
+                                <i class="fa fa-globe"></i> <span>Domains</span>
                             </a>
                         </li>
                         <li class="{{ ! starts_with(Route::currentRouteName(), 'admin.servers') ?: 'active' }}">
