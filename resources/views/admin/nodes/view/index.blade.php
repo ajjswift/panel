@@ -21,6 +21,7 @@
                 <li class="active"><a href="{{ route('admin.nodes.view', $node->id) }}">About</a></li>
                 <li><a href="{{ route('admin.nodes.view.settings', $node->id) }}">Settings</a></li>
                 <li><a href="{{ route('admin.nodes.view.configuration', $node->id) }}">Configuration</a></li>
+                <li><a href="{{ route('admin.nodes.view.reverse-proxy', $node->id) }}">Reverse Proxy</a></li>
                 <li><a href="{{ route('admin.nodes.view.allocation', $node->id) }}">Allocation</a></li>
                 <li><a href="{{ route('admin.nodes.view.servers', $node->id) }}">Servers</a></li>
             </ul>

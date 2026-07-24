@@ -49,6 +49,8 @@ class ManagedSubdomain extends Model
         'desired_record_plan' => 'array',
         'last_synchronized_at' => 'datetime',
         'provider_drift_detected_at' => 'datetime',
+        'proxy_cert_expires_at' => 'datetime',
+        'proxy_reported_at' => 'datetime',
         'deleted_at' => 'datetime',
     ];
 

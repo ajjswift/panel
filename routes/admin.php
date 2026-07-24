@@ -176,6 +176,9 @@ Route::group(['prefix' => 'nodes'], function () {
     Route::get('/view/{node:id}/configuration', [Admin\Nodes\NodeViewController::class, 'configuration'])->name('admin.nodes.view.configuration');
     Route::get('/view/{node:id}/allocation', [Admin\Nodes\NodeViewController::class, 'allocations'])->name('admin.nodes.view.allocation');
     Route::get('/view/{node:id}/servers', [Admin\Nodes\NodeViewController::class, 'servers'])->name('admin.nodes.view.servers');
+    Route::get('/view/{node:id}/reverse-proxy', [Admin\Nodes\NodeViewController::class, 'reverseProxy'])->name('admin.nodes.view.reverse-proxy');
+    Route::post('/view/{node:id}/reverse-proxy', [Admin\Nodes\ReverseProxyNodeController::class, 'update'])->name('admin.nodes.view.reverse-proxy.update');
+    Route::post('/view/{node:id}/reverse-proxy/rotate', [Admin\Nodes\ReverseProxyNodeController::class, 'rotate'])->name('admin.nodes.view.reverse-proxy.rotate');
     Route::get('/view/{node:id}/system-information', Admin\Nodes\SystemInformationController::class);
 
     Route::post('/new', [Admin\NodesController::class, 'store']);

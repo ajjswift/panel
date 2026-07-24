@@ -63,6 +63,31 @@ class NodeViewController extends Controller
     }
 
     /**
+     * Return the reverse-proxy management page for a specific node.
+     */
+    public function reverseProxy(
+        Request $request,
+        Node $node,
+        \Pterodactyl\Services\ReverseProxy\ReverseProxyInstallService $installService,
+    ): View {
+        $installCommand = null;
+        if ($node->reverse_proxy_base_domain_id) {
+            try {
+                $installCommand = $installService->command($node->refresh());
+            } catch (\Pterodactyl\Exceptions\DisplayException) {
+                $installCommand = null;
+            }
+        }
+
+        return view('admin.nodes.view.reverse-proxy', [
+            'node' => $node,
+            'domains' => \Pterodactyl\Models\ManagedDomain::query()->orderBy('domain')->get(),
+            'installCommand' => $installCommand,
+            'offlineAfter' => (int) config('reverse-proxy.offline_after'),
+        ]);
+    }
+
+    /**
      * Return the node allocation management page.
      */
     public function allocations(Request $request, Node $node): View

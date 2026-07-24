@@ -63,6 +63,12 @@ class SyncManagedSubdomainJob implements ShouldQueue
 
                 throw $exception;
             }
+
+            // Once the public DNS record exists, hand reverse-proxy routes to
+            // the node's agent so it can obtain a certificate and start serving.
+            if ($managed->routing_mode === \Pterodactyl\Enum\DnsRoutingMode::ReverseProxy) {
+                \Pterodactyl\Jobs\ReverseProxy\SyncNodeReverseProxyJob::dispatch($managed->server->node_id);
+            }
         } finally {
             $lock->release();
         }

@@ -24,6 +24,23 @@ class AllocationTransformer extends BaseClientTransformer
             'notes' => $model->notes,
             'is_default' => $model->server->allocation_id === $model->id,
             'managed_hostname_count' => (int) ($model->getAttribute('managed_hostname_count') ?? 0),
+            // The friendly address to show in place of ip:port, when this
+            // allocation has an active managed address served over direct DNS.
+            // Reverse-proxied addresses are intentionally excluded — their raw
+            // ip:port is still what a direct client connects to.
+            'connection_address' => $this->activeConnectionAddress($model),
         ];
+    }
+
+    private function activeConnectionAddress(Allocation $model): ?string
+    {
+        $subdomain = $model->managedSubdomains()
+            ->whereNull('deleted_at')
+            ->where('status', 'active')
+            ->where('routing_mode', 'direct_dns')
+            ->orderBy('id')
+            ->first();
+
+        return $subdomain?->connection_address;
     }
 }

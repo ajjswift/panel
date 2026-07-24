@@ -7,12 +7,14 @@ use Pterodactyl\Models\User;
 use Pterodactyl\Models\Server;
 use Pterodactyl\Facades\Activity;
 use Pterodactyl\Models\Allocation;
+use Pterodactyl\Enum\DnsRoutingMode;
 use Illuminate\Support\Facades\Cache;
 use Pterodactyl\Models\ManagedDomain;
 use Pterodactyl\Models\ManagedSubdomain;
 use Pterodactyl\Enum\ManagedSubdomainStatus;
 use Pterodactyl\Exceptions\DisplayException;
 use Pterodactyl\Jobs\Dns\SyncManagedSubdomainJob;
+use Pterodactyl\Jobs\ReverseProxy\SyncNodeReverseProxyJob;
 
 class ManagedSubdomainCreationService
 {
@@ -68,6 +70,8 @@ class ManagedSubdomainCreationService
                         throw new DisplayException('This hostname is already in use. Choose another name or contact an administrator.');
                     }
 
+                    $isProxy = ($preview['record_plan']['access_method'] ?? 'clean') === 'proxy';
+
                     $managed = new ManagedSubdomain();
                     $managed->forceFill([
                         'uuid' => Uuid::uuid4()->toString(),
@@ -78,7 +82,7 @@ class ManagedSubdomainCreationService
                         'dns_service_profile_id' => $preview['service_profile']['id'],
                         'label' => $preview['label'],
                         'fqdn' => $preview['fqdn'],
-                        'routing_mode' => 'direct_dns',
+                        'routing_mode' => $isProxy ? 'reverse_proxy' : 'direct_dns',
                         'detected_service' => $preview['service_profile']['name'],
                         'service_detection_source' => $preview['service_profile']['detection_source'],
                         'status' => ManagedSubdomainStatus::Pending,
@@ -96,6 +100,13 @@ class ManagedSubdomainCreationService
                 });
 
             SyncManagedSubdomainJob::dispatch($managed->id, $managed->desired_state_version)->afterCommit();
+
+            // Reverse-proxied addresses also need the node's agent to learn
+            // about the new route (DNS + certificate + proxy happen there). The
+            // job no-ops if the node has no agent enabled.
+            if ($managed->routing_mode === DnsRoutingMode::ReverseProxy) {
+                SyncNodeReverseProxyJob::dispatch($server->node_id)->afterCommit();
+            }
 
             return $managed;
         } finally {

@@ -2,9 +2,17 @@
 
 use Illuminate\Support\Facades\Route;
 use Pterodactyl\Http\Controllers\Api\Remote;
+use Pterodactyl\Http\Middleware\Api\Daemon\AuthenticateReverseProxyAgent;
 
 // Routes for the Wings daemon.
 Route::post('/sftp/auth', Remote\SftpAuthenticationController::class);
+
+// Reverse-proxy agent status callback. Uses its own credential (not the Wings
+// daemon token), so it opts out of the group's daemon authentication.
+Route::post('/proxy/status', Remote\ReverseProxy\ReverseProxyStatusController::class)
+    ->name('api.remote.proxy.status')
+    ->withoutMiddleware('daemon')
+    ->middleware(AuthenticateReverseProxyAgent::class);
 
 Route::get('/servers', [Remote\Servers\ServerDetailsController::class, 'list']);
 Route::post('/servers/reset', [Remote\Servers\ServerDetailsController::class, 'resetState']);

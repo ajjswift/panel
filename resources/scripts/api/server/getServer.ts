@@ -11,6 +11,9 @@ export interface Allocation {
     notes: string | null;
     isDefault: boolean;
     managedHostnameCount: number;
+    // Friendly address (e.g. play.example.com) when a direct-DNS managed
+    // address points at this allocation; null otherwise.
+    connectionAddress: string | null;
 }
 
 export interface Server {

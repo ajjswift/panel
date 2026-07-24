@@ -79,6 +79,10 @@ export interface ManagedSubdomain {
     connectionAddress: string;
     publicTarget: { type: string; value: string };
     targetPort: number;
+    // Reverse-proxy stage reporting from the node agent (null for direct DNS).
+    proxyDnsStatus: string | null;
+    proxyCertStatus: string | null;
+    proxyStatus: string | null;
     recordPlan: DnsRecordPreview;
     recordCount: number;
     lastSynchronizedAt: string | null;
@@ -148,6 +152,9 @@ const subdomain = ({ attributes: data }: FractalResponseData): ManagedSubdomain 
     connectionAddress: data.connection_address,
     publicTarget: data.public_target,
     targetPort: data.target_port,
+    proxyDnsStatus: data.proxy_dns_status ?? null,
+    proxyCertStatus: data.proxy_cert_status ?? null,
+    proxyStatus: data.proxy_status ?? null,
     recordPlan: recordPlan(data.record_plan),
     recordCount: data.record_count,
     lastSynchronizedAt: data.last_synchronized_at,

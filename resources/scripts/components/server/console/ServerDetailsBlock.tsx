@@ -58,8 +58,12 @@ const ServerDetailsBlock = ({ className }: { className?: string }) => {
 
     const allocation = ServerContext.useStoreState((state) => {
         const match = state.server.data!.allocations.find((allocation) => allocation.isDefault);
+        if (!match) return 'n/a';
 
-        return !match ? 'n/a' : `${match.alias || ip(match.ip)}:${match.port}`;
+        // Prefer a friendly managed address when one points at the primary port
+        // over direct DNS (SRV or default-port). Reverse-proxied addresses keep
+        // the raw ip:port, which is what a direct client uses.
+        return match.connectionAddress || `${match.alias || ip(match.ip)}:${match.port}`;
     });
 
     useEffect(() => {

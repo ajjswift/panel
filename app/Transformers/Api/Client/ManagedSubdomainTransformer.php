@@ -35,6 +35,10 @@ class ManagedSubdomainTransformer extends BaseClientTransformer
             'detected_service' => $model->detected_service,
             'service_detection_source' => $model->service_detection_source,
             'connection_address' => $model->connection_address,
+            'proxy_dns_status' => $model->proxy_dns_status,
+            'proxy_cert_status' => $model->proxy_cert_status,
+            'proxy_status' => $model->proxy_status,
+            'proxy_cert_expires_at' => $model->proxy_cert_expires_at?->toAtomString(),
             'public_target' => [
                 'type' => $model->public_target_type,
                 'value' => $model->public_target,

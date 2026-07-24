@@ -67,7 +67,10 @@ class Node extends Model implements Identifiable
     /**
      * The attributes excluded from the model's JSON form.
      */
-    protected $hidden = ['daemon_token_id', 'daemon_token'];
+    protected $hidden = [
+        'daemon_token_id', 'daemon_token',
+        'reverse_proxy_api_key', 'reverse_proxy_token_id', 'reverse_proxy_token',
+    ];
 
     /**
      * Cast values to correct type.
@@ -81,6 +84,10 @@ class Node extends Model implements Identifiable
         'behind_proxy' => 'boolean',
         'public' => 'boolean',
         'maintenance_mode' => 'boolean',
+        'reverse_proxy_enabled' => 'boolean',
+        'reverse_proxy_base_domain_id' => 'integer',
+        'reverse_proxy_control_port' => 'integer',
+        'reverse_proxy_last_seen_at' => 'datetime',
     ];
 
     /**
@@ -94,6 +101,7 @@ class Node extends Model implements Identifiable
         'disk_overallocate', 'upload_size', 'daemonBase',
         'daemonSFTP', 'daemonListen',
         'description', 'maintenance_mode',
+        'reverse_proxy_enabled', 'reverse_proxy_base_domain_id', 'reverse_proxy_control_port',
     ];
 
     public static array $validationRules = [
@@ -238,6 +246,47 @@ class Node extends Model implements Identifiable
     public function allocations(): HasMany
     {
         return $this->hasMany(Allocation::class);
+    }
+
+    /**
+     * The managed domain under which this node's reverse-proxy agent hostname
+     * lives.
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo<\Pterodactyl\Models\ManagedDomain, $this>
+     */
+    public function reverseProxyBaseDomain(): BelongsTo
+    {
+        return $this->belongsTo(ManagedDomain::class, 'reverse_proxy_base_domain_id');
+    }
+
+    /**
+     * The DNS label for this node, derived from its name. Used to build the
+     * agent hostname {slug}.{base-domain}.
+     */
+    public function reverseProxySlug(): string
+    {
+        return Str::slug($this->name);
+    }
+
+    /**
+     * The full public hostname the reverse-proxy agent is reachable at, or null
+     * when the node has no base domain configured yet.
+     */
+    public function reverseProxyHostname(): ?string
+    {
+        $base = $this->reverseProxyBaseDomain;
+
+        return $base ? sprintf('%s.%s', $this->reverseProxySlug(), $base->domain) : null;
+    }
+
+    /**
+     * Base URL of the agent's control API.
+     */
+    public function reverseProxyControlUrl(): ?string
+    {
+        $hostname = $this->reverseProxyHostname();
+
+        return $hostname ? sprintf('https://%s:%d/v1', $hostname, $this->reverse_proxy_control_port) : null;
     }
 
     /**

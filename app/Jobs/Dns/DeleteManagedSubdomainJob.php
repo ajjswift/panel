@@ -46,6 +46,9 @@ class DeleteManagedSubdomainJob implements ShouldQueue
             return;
         }
 
+        $wasProxy = $managed->routing_mode === \Pterodactyl\Enum\DnsRoutingMode::ReverseProxy;
+        $nodeId = $managed->server->node_id;
+
         try {
             try {
                 $synchronizer->delete($managed);
@@ -57,6 +60,12 @@ class DeleteManagedSubdomainJob implements ShouldQueue
                 }
 
                 throw $exception;
+            }
+
+            // Re-push the node's route set (now without this address) so the
+            // agent tears down its proxy and certificate.
+            if ($wasProxy) {
+                \Pterodactyl\Jobs\ReverseProxy\SyncNodeReverseProxyJob::dispatch($nodeId);
             }
         } finally {
             $lock->release();
