@@ -45,17 +45,31 @@ export const rawDataToSwitchOperation = (data: FractalResponseData | null): Swit
     };
 };
 
+const overviewFromResponse = (data: any): GameSlotOverview => ({
+    slots: (data.data || []).map(rawDataToGameSlot),
+    slotLimit: data.meta.slot_limit,
+    slotCount: data.meta.slot_count,
+    serverDiskBytes: data.meta.server_disk_bytes,
+    combinedSlotUsageBytes: data.meta.combined_slot_usage_bytes,
+    isSwitching: !!data.meta.is_switching,
+    recoverable: !!data.meta.recoverable,
+    activeOperation: rawDataToSwitchOperation(data.meta.active_operation),
+    latestOperation: rawDataToSwitchOperation(data.meta.latest_operation),
+});
+
 export const getGameSlots = async (uuid: string): Promise<GameSlotOverview> => {
     const { data } = await http.get(`/api/client/servers/${uuid}/game-slots`);
 
-    return {
-        slots: (data.data || []).map(rawDataToGameSlot),
-        slotLimit: data.meta.slot_limit,
-        slotCount: data.meta.slot_count,
-        serverDiskBytes: data.meta.server_disk_bytes,
-        combinedSlotUsageBytes: data.meta.combined_slot_usage_bytes,
-        activeOperation: rawDataToSwitchOperation(data.meta.active_operation),
-    };
+    return overviewFromResponse(data);
+};
+
+/**
+ * Force a stuck or broken switch back to a clean state. Never deletes files.
+ */
+export const recoverGameSwitch = async (uuid: string): Promise<GameSlotOverview> => {
+    const { data } = await http.post(`/api/client/servers/${uuid}/game-slots/recover`);
+
+    return overviewFromResponse(data);
 };
 
 export const getGameTemplates = async (uuid: string): Promise<GameTemplate[]> => {

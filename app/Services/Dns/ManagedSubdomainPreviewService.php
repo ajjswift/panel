@@ -17,7 +17,7 @@ class ManagedSubdomainPreviewService
         private DnsTargetResolver $targetResolver,
         private DnsRecordPlanner $recordPlanner,
         private ManagedHostnameAvailabilityService $availabilityService,
-        private HttpServiceDetector $httpDetector,
+        private AllocationServiceDetector $serviceDetector,
     ) {
     }
 
@@ -62,13 +62,13 @@ class ManagedSubdomainPreviewService
         $target = $this->targetResolver->resolve($allocation, $domain);
         $reverseProxyTarget = $this->targetResolver->resolveForReverseProxy($allocation);
 
-        // One HTTP request to the port decides the routing: if it answers as a
-        // website it goes through the node's reverse proxy for a clean, port-free
-        // address; otherwise it stays on plain DNS. An SRV record is only worth
-        // resolving for a non-web game whose egg advertises SRV support. Nothing
-        // here blocks creation — the planner always produces a working record.
-        $webScheme = $this->httpDetector->detect($target, $allocation->port);
-        $srvTarget = (!$webScheme && $profile->supports_srv)
+        // Probe the port to decide routing, in order: an HTTP response means a
+        // website (reverse proxy for a clean, port-free address); otherwise a
+        // Minecraft handshake means a Minecraft server (clean SRV record);
+        // otherwise a plain DNS record as a last resort. Nothing here blocks
+        // creation — the planner always produces a working record.
+        $detected = $this->serviceDetector->detect($allocation);
+        $srvTarget = $detected->isMinecraftJava()
             ? $this->targetResolver->resolveForSrv($allocation)
             : null;
 
@@ -79,16 +79,16 @@ class ManagedSubdomainPreviewService
             $profile,
             $target,
             $reverseProxyTarget,
-            $webScheme,
-            null,
+            $detected->isHttp() ? 'http' : null,
+            $detected->isMinecraftJava(),
             $srvTarget,
         );
         $publicTarget = $plan->accessMethod === DnsRecordPlan::ACCESS_PROXY
             ? ($reverseProxyTarget ?? $target)
             : $target;
-        $detectedService = $plan->webDetectionSource === 'http_probe'
+        $detectedService = $detected->isHttp()
             ? 'Website'
-            : ($plan->minecraftDetected ? 'Minecraft Java' : $profile->name);
+            : ($detected->isMinecraftJava() ? 'Minecraft Java' : $profile->name);
 
         return [
             'label' => $label,

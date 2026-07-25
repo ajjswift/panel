@@ -13,11 +13,12 @@ use Pterodactyl\Exceptions\DisplayException;
 use Pterodactyl\Services\Dns\DnsRecordPlanner;
 use Pterodactyl\Services\Dns\DnsTargetResolver;
 use Pterodactyl\Services\Dns\Results\DnsTarget;
-use Pterodactyl\Services\Dns\HttpServiceDetector;
 use Pterodactyl\Services\Dns\SubdomainPolicyResolver;
+use Pterodactyl\Services\Dns\AllocationServiceDetector;
 use Pterodactyl\Services\Dns\DnsServiceProfileResolver;
 use Pterodactyl\Services\Dns\Results\SubdomainPolicyResult;
 use Pterodactyl\Services\Dns\ManagedSubdomainPreviewService;
+use Pterodactyl\Services\Dns\Results\DetectedAllocationService;
 use Pterodactyl\Services\Dns\ManagedHostnameAvailabilityService;
 
 class ManagedSubdomainPreviewServiceTest extends TestCase
@@ -26,19 +27,23 @@ class ManagedSubdomainPreviewServiceTest extends TestCase
     {
         [$server, $allocation, $domain, $policy] = $this->context();
 
-        $policyResolver = $this->createMock(SubdomainPolicyResolver::class);
-        $policyResolver->method('resolve')->willReturn($policy);
         $availability = $this->createMock(ManagedHostnameAvailabilityService::class);
         $availability->expects($this->once())
             ->method('assertAvailable')
             ->with($domain, 'dynmap.example.com')
             ->willThrowException(new DisplayException('DNS already exists.'));
-        $detector = $this->createMock(HttpServiceDetector::class);
+        $detector = $this->createMock(AllocationServiceDetector::class);
         $detector->expects($this->never())->method('detect');
         $profiles = $this->createMock(DnsServiceProfileResolver::class);
         $profiles->expects($this->never())->method('resolve');
 
-        $service = $this->service($policyResolver, $profiles, $this->createMock(DnsTargetResolver::class), $availability, $detector);
+        $service = $this->service(
+            $this->policyResolver($policy),
+            $profiles,
+            $this->createMock(DnsTargetResolver::class),
+            $availability,
+            $detector,
+        );
 
         $this->expectException(DisplayException::class);
         $this->expectExceptionMessage('DNS already exists.');
@@ -52,15 +57,13 @@ class ManagedSubdomainPreviewServiceTest extends TestCase
         $targets = $this->createMock(DnsTargetResolver::class);
         $targets->method('resolve')->willReturn(new DnsTarget('A', '203.0.113.10', 'allocation_ip'));
         $targets->method('resolveForReverseProxy')->willReturn(new DnsTarget('A', '198.51.100.20', 'node_reverse_proxy_ipv4'));
-        $detector = $this->createMock(HttpServiceDetector::class);
-        $detector->expects($this->once())->method('detect')->willReturn('http');
 
         $service = $this->service(
             $this->policyResolver($policy),
             $this->profileResolver($this->genericProfile()),
             $targets,
             $this->createMock(ManagedHostnameAvailabilityService::class),
-            $detector,
+            $this->detector(DetectedAllocationService::HTTP),
         );
 
         $preview = $service->handle($server, new User(), $domain, $allocation, 'dynmap');
@@ -79,15 +82,13 @@ class ManagedSubdomainPreviewServiceTest extends TestCase
         $targets = $this->createMock(DnsTargetResolver::class);
         $targets->method('resolve')->willReturn(new DnsTarget('A', '203.0.113.10', 'allocation_ip'));
         $targets->method('resolveForReverseProxy')->willReturn(null);
-        $detector = $this->createMock(HttpServiceDetector::class);
-        $detector->method('detect')->willReturn('http');
 
         $service = $this->service(
             $this->policyResolver($policy),
             $this->profileResolver($this->genericProfile()),
             $targets,
             $this->createMock(ManagedHostnameAvailabilityService::class),
-            $detector,
+            $this->detector(DetectedAllocationService::HTTP),
         );
 
         $preview = $service->handle($server, new User(), $domain, $allocation, 'dynmap');
@@ -99,7 +100,7 @@ class ManagedSubdomainPreviewServiceTest extends TestCase
         $this->assertSame('A', $preview['record_plan']['records'][0]['type']);
     }
 
-    public function testNonWebGameUsesAnSrvRecordWhenSupported(): void
+    public function testDetectedMinecraftUsesAnSrvRecord(): void
     {
         [$server, $allocation, $domain, $policy] = $this->context();
 
@@ -107,15 +108,13 @@ class ManagedSubdomainPreviewServiceTest extends TestCase
         $targets->method('resolve')->willReturn(new DnsTarget('A', '203.0.113.10', 'allocation_ip'));
         $targets->method('resolveForReverseProxy')->willReturn(null);
         $targets->method('resolveForSrv')->willReturn('node.example.net');
-        $detector = $this->createMock(HttpServiceDetector::class);
-        $detector->method('detect')->willReturn(null);
 
         $service = $this->service(
             $this->policyResolver($policy),
             $this->profileResolver($this->genericProfile()),
             $targets,
             $this->createMock(ManagedHostnameAvailabilityService::class),
-            $detector,
+            $this->detector(DetectedAllocationService::MINECRAFT_JAVA),
         );
 
         $preview = $service->handle($server, new User(), $domain, $allocation, 'survival');
@@ -124,10 +123,11 @@ class ManagedSubdomainPreviewServiceTest extends TestCase
         $this->assertSame('SRV', $preview['record_plan']['records'][0]['type']);
         $this->assertSame('_minecraft._tcp.survival.example.com', $preview['record_plan']['records'][0]['name']);
         $this->assertSame('node.example.net', $preview['record_plan']['records'][0]['target']);
+        $this->assertSame('Minecraft Java', $preview['detected_service']);
         $this->assertTrue($preview['record_plan']['minecraft_detected']);
     }
 
-    public function testNonWebGameFallsBackToAPortAddressWithoutAnSrvTarget(): void
+    public function testDetectedMinecraftFallsBackToAPortAddressWithoutAnSrvTarget(): void
     {
         [$server, $allocation, $domain, $policy] = $this->context();
 
@@ -135,15 +135,13 @@ class ManagedSubdomainPreviewServiceTest extends TestCase
         $targets->method('resolve')->willReturn(new DnsTarget('A', '203.0.113.10', 'allocation_ip'));
         $targets->method('resolveForReverseProxy')->willReturn(null);
         $targets->method('resolveForSrv')->willReturn(null);
-        $detector = $this->createMock(HttpServiceDetector::class);
-        $detector->method('detect')->willReturn(null);
 
         $service = $this->service(
             $this->policyResolver($policy),
             $this->profileResolver($this->genericProfile()),
             $targets,
             $this->createMock(ManagedHostnameAvailabilityService::class),
-            $detector,
+            $this->detector(DetectedAllocationService::MINECRAFT_JAVA),
         );
 
         $preview = $service->handle($server, new User(), $domain, $allocation, 'survival');
@@ -158,7 +156,7 @@ class ManagedSubdomainPreviewServiceTest extends TestCase
         DnsServiceProfileResolver $profiles,
         DnsTargetResolver $targets,
         ManagedHostnameAvailabilityService $availability,
-        HttpServiceDetector $detector,
+        AllocationServiceDetector $detector,
     ): ManagedSubdomainPreviewService {
         return new ManagedSubdomainPreviewService(
             $policyResolver,
@@ -168,6 +166,14 @@ class ManagedSubdomainPreviewServiceTest extends TestCase
             $availability,
             $detector,
         );
+    }
+
+    private function detector(string $type): AllocationServiceDetector
+    {
+        $detector = $this->createMock(AllocationServiceDetector::class);
+        $detector->method('detect')->willReturn(new DetectedAllocationService($type));
+
+        return $detector;
     }
 
     private function policyResolver(SubdomainPolicyResult $policy): SubdomainPolicyResolver
@@ -204,7 +210,7 @@ class ManagedSubdomainPreviewServiceTest extends TestCase
     private function context(): array
     {
         $server = (new Server())->forceFill(['id' => 10]);
-        $allocation = (new Allocation())->forceFill(['id' => 20, 'server_id' => 10, 'port' => 8123]);
+        $allocation = (new Allocation())->forceFill(['id' => 20, 'server_id' => 10, 'ip' => '203.0.113.10', 'port' => 8123]);
         $domain = (new ManagedDomain())->forceFill([
             'id' => 30,
             'domain' => 'example.com',

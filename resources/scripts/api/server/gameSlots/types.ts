@@ -65,7 +65,10 @@ export interface GameSlotOverview {
     slotCount: number;
     serverDiskBytes: number;
     combinedSlotUsageBytes: number;
+    isSwitching: boolean;
+    recoverable: boolean;
     activeOperation: SwitchOperation | null;
+    latestOperation: SwitchOperation | null;
 }
 
 export interface GameTemplateVariable {

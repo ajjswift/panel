@@ -179,6 +179,10 @@ Route::group([
         Route::post('/operations/{gameSwitchOperation}/retry', [Client\Servers\GameSwitchOperationController::class, 'retry'])
             ->middleware('throttle:2,1');
 
+        // Owner escape hatch: reset a stuck/broken switch back to a clean state.
+        Route::post('/recover', [Client\Servers\GameSlotController::class, 'recover'])
+            ->middleware('throttle:4,1');
+
         Route::get('/{gameSlot}', [Client\Servers\GameSlotController::class, 'view']);
         Route::patch('/{gameSlot}', [Client\Servers\GameSlotController::class, 'update']);
         Route::put('/{gameSlot}/startup', [Client\Servers\GameSlotController::class, 'updateStartup']);

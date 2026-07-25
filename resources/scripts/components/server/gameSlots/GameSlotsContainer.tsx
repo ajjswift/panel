@@ -1,7 +1,6 @@
-import React, { useState } from 'react';
-import { useHistory } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlus } from '@fortawesome/free-solid-svg-icons';
+import { faPlus, faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
 import ServerContentBlock from '@/components/elements/ServerContentBlock';
 import Spinner from '@/components/elements/Spinner';
 import FlashMessageRender from '@/components/FlashMessageRender';
@@ -10,7 +9,7 @@ import useFlash from '@/plugins/useFlash';
 import { usePermissions } from '@/plugins/usePermissions';
 import { ServerContext } from '@/state/server';
 import { bytesToString } from '@/lib/formatters';
-import { activateGameSlot, createGameSlot, deleteGameSlot } from '@/api/server/gameSlots';
+import { activateGameSlot, createGameSlot, deleteGameSlot, recoverGameSwitch } from '@/api/server/gameSlots';
 import { GameSlot } from '@/api/server/gameSlots/types';
 import getGameSlots from '@/api/swr/getGameSlots';
 import GameSlotCard from './GameSlotCard';
@@ -20,22 +19,27 @@ import DeleteSlotDialog from './DeleteSlotDialog';
 import SwitchProgress from './SwitchProgress';
 import styles from './gameSlots.module.css';
 
+const failedStates = ['failed_rolled_back', 'failed_requires_action'];
+
 const GameSlotsContainer = () => {
-    const history = useHistory();
     const { clearFlashes, clearAndAddHttpError } = useFlash();
     const [canCreate, canSwitch, canDelete] = usePermissions(['gameslot.create', 'gameslot.switch', 'gameslot.delete']);
     const uuid = ServerContext.useStoreState((state) => state.server.data!.uuid);
-    const serverStatus = ServerContext.useStoreState((state) => state.server.data?.status ?? null);
 
     const [createOpen, setCreateOpen] = useState(false);
     const [switchTarget, setSwitchTarget] = useState<GameSlot | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<GameSlot | null>(null);
     const [submitting, setSubmitting] = useState(false);
+    const [recovering, setRecovering] = useState(false);
+    const [poll, setPoll] = useState(false);
 
-    // Poll while a switch is running (or the server is stuck in the switching
-    // status) so progress and completion appear without a manual refresh.
-    const isSwitching = serverStatus === 'switching_game';
-    const { data, error, mutate } = getGameSlots(isSwitching);
+    // Poll while a switch is actually in progress so progress and the final
+    // outcome (success or failure) surface without a manual refresh.
+    const { data, error, mutate } = getGameSlots(poll);
+
+    useEffect(() => {
+        setPoll(!!(data?.isSwitching || data?.activeOperation?.isActive));
+    }, [data?.isSwitching, data?.activeOperation?.isActive]);
 
     if (!data && !error) {
         return (
@@ -56,8 +60,15 @@ const GameSlotsContainer = () => {
 
     const active = data.slots.find((s) => s.isActive);
     const operation = data.activeOperation;
-    const operationActive = !!operation?.isActive || isSwitching;
+    const operationActive = !!operation?.isActive || data.isSwitching;
     const atLimit = data.slotCount >= data.slotLimit;
+
+    // A switch that finished in a failed state (and is no longer running) — shown
+    // so a failure is never silent, with a way to recover from it.
+    const failedOperation =
+        !operationActive && data.latestOperation && failedStates.includes(data.latestOperation.state)
+            ? data.latestOperation
+            : null;
 
     const withSubmit = async (key: string, fn: () => Promise<unknown>, onDone?: () => void) => {
         setSubmitting(true);
@@ -80,10 +91,25 @@ const GameSlotsContainer = () => {
         try {
             await activateGameSlot(uuid, slot.uuid, restartAfter);
             setSwitchTarget(null);
-            history.replace('/');
+            // Stay on the page and let the live progress panel take over so the
+            // outcome — success or failure — is always visible.
+            await mutate();
         } catch (e) {
             clearAndAddHttpError({ key: 'game-slots', error: e });
+        } finally {
             setSubmitting(false);
+        }
+    };
+
+    const resetSwitch = async () => {
+        setRecovering(true);
+        clearFlashes('game-slots');
+        try {
+            await mutate(await recoverGameSwitch(uuid), false);
+        } catch (e) {
+            clearAndAddHttpError({ key: 'game-slots', error: e });
+        } finally {
+            setRecovering(false);
         }
     };
 
@@ -131,12 +157,37 @@ const GameSlotsContainer = () => {
                 </div>
                 <div className={styles.summary_tile}>
                     <span className={styles.summary_label}>Status</span>
-                    <span className={styles.summary_value}>{operationActive ? 'Switching' : 'Ready'}</span>
+                    <span className={styles.summary_value}>
+                        {operationActive ? 'Switching' : failedOperation || data.recoverable ? 'Needs attention' : 'Ready'}
+                    </span>
                 </div>
             </div>
 
             {operation && (operationActive || operation.state !== 'completed') && (
                 <SwitchProgress operation={operation} />
+            )}
+
+            {(failedOperation || data.recoverable) && !operationActive && (
+                <div
+                    role={'alert'}
+                    className={'rounded-lg border border-warning/40 bg-warning/10 px-4 py-3 mb-4 flex flex-wrap items-start justify-between gap-3'}
+                >
+                    <div className={'min-w-0'}>
+                        <p className={'text-sm font-semibold text-warning-text flex items-center gap-2'}>
+                            <FontAwesomeIcon icon={faExclamationTriangle} className={'w-3.5 h-3.5'} />
+                            {data.recoverable ? 'This switch got stuck' : 'The last switch didn’t finish'}
+                        </p>
+                        <p className={'text-sm text-body-muted mt-1'}>
+                            {failedOperation?.errorMessage ||
+                                'Your games are all safe — nothing was deleted. Reset to get things back to normal.'}
+                        </p>
+                    </div>
+                    {canSwitch && (
+                        <Button.Text className={'shrink-0'} onClick={resetSwitch} disabled={recovering}>
+                            {recovering ? 'Resetting…' : 'Reset'}
+                        </Button.Text>
+                    )}
+                </div>
             )}
 
             {atLimit && !operationActive && (

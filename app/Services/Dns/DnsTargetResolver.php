@@ -42,6 +42,43 @@ class DnsTargetResolver
     }
 
     /**
+     * Ordered list of hosts the panel should try when probing what service is
+     * actually running on an allocation. Detection must connect to where the
+     * service really listens — the allocation's own IP first (correct when the
+     * panel and node are co-located, or the allocation is a public IP), then the
+     * node's public address (correct when the game port is exposed to the world
+     * behind a private bind). Duplicates and unroutable placeholders are dropped.
+     *
+     * @return string[]
+     */
+    public function resolveProbeCandidates(Allocation $allocation): array
+    {
+        $allocation->loadMissing('node');
+        $node = $allocation->node;
+
+        $candidates = [
+            $allocation->ip,
+            $node->dns_target_ipv4,
+            $node->dns_target_ipv6,
+            $node->dns_target_hostname,
+            $node->fqdn,
+        ];
+
+        $seen = [];
+        foreach ($candidates as $candidate) {
+            $host = is_string($candidate) ? strtolower(trim(rtrim($candidate, '.'))) : '';
+            // 0.0.0.0 / :: are "listen on everything" placeholders, not a
+            // reachable address to connect to.
+            if ($host === '' || $host === '0.0.0.0' || $host === '::' || isset($seen[$host])) {
+                continue;
+            }
+            $seen[$host] = true;
+        }
+
+        return array_keys($seen);
+    }
+
+    /**
      * Resolve the public address of the reverse-proxy agent on this allocation's
      * node. A null result means this node cannot currently host proxy routes.
      */

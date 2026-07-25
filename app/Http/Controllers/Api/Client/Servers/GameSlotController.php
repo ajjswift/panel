@@ -6,12 +6,14 @@ use Pterodactyl\Models\Server;
 use Pterodactyl\Models\GameSlot;
 use Illuminate\Http\JsonResponse;
 use Pterodactyl\Facades\Activity;
+use Pterodactyl\Models\GameSwitchOperation;
 use Pterodactyl\Services\GameSlots\GameSwitchService;
 use Pterodactyl\Jobs\GameSlots\ScanGameSlotDiskUsageJob;
 use Pterodactyl\Services\GameSlots\GameSlotUpdateService;
 use Pterodactyl\Services\GameSlots\GameSlotAdoptionService;
 use Pterodactyl\Services\GameSlots\GameSlotCreationService;
 use Pterodactyl\Services\GameSlots\GameSlotDeletionService;
+use Pterodactyl\Services\GameSlots\GameSwitchRecoveryService;
 use Pterodactyl\Transformers\Api\Client\GameSlotTransformer;
 use Pterodactyl\Http\Controllers\Api\Client\ClientApiController;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
@@ -21,6 +23,7 @@ use Pterodactyl\Http\Requests\Api\Client\Servers\GameSlots\StoreGameSlotRequest;
 use Pterodactyl\Http\Requests\Api\Client\Servers\GameSlots\DeleteGameSlotRequest;
 use Pterodactyl\Http\Requests\Api\Client\Servers\GameSlots\UpdateGameSlotRequest;
 use Pterodactyl\Http\Requests\Api\Client\Servers\GameSlots\ActivateGameSlotRequest;
+use Pterodactyl\Http\Requests\Api\Client\Servers\GameSlots\RecoverGameSwitchRequest;
 use Pterodactyl\Http\Requests\Api\Client\Servers\GameSlots\UpdateGameSlotStartupRequest;
 
 class GameSlotController extends ClientApiController
@@ -31,6 +34,7 @@ class GameSlotController extends ClientApiController
         private GameSlotUpdateService $updateService,
         private GameSlotDeletionService $deletionService,
         private GameSwitchService $switchService,
+        private GameSwitchRecoveryService $recoveryService,
     ) {
         parent::__construct();
     }
@@ -43,13 +47,47 @@ class GameSlotController extends ClientApiController
     {
         $this->adoptionService->handle($server);
 
+        // Self-heal a stranded switch: if the server is flagged as switching but
+        // nothing is actually running, or a commit left no active slot, quietly
+        // put it right so the page is never stuck showing "Switching".
+        $this->recoveryService->healStaleState($server);
+        $server->refresh();
+
         // Kick off a (rate-limited) background disk scan so usage figures stay
         // fresh without blocking this request. Dispatched after the response so
         // it never delays or fails the page load.
         ScanGameSlotDiskUsageJob::dispatch($server->id)->afterResponse();
 
+        return $this->overview($server);
+    }
+
+    /**
+     * Owner escape hatch for a stuck switch: clear a dead operation lock, return
+     * the server to normal, and guarantee a single active slot. Never deletes a
+     * slot's files.
+     *
+     * @throws \Throwable
+     */
+    public function recover(RecoverGameSwitchRequest $request, Server $server): array
+    {
+        Activity::event('server:gameslot.switch-recover')
+            ->property('server', $server->uuid)
+            ->transaction(fn () => $this->recoveryService->resetForServer($server));
+
+        return $this->overview($server->refresh());
+    }
+
+    /**
+     * Build the game-slots overview payload (slots + switch state + recovery
+     * flags). Shared by index() and recover() so both return an identical shape.
+     */
+    private function overview(Server $server): array
+    {
         $slots = $server->gameSlots()->with('egg')->orderBy('id')->get();
         $activeOperation = $server->activeGameSwitchOperation()->first();
+        $latestOperation = $server->gameSwitchOperations()->orderByDesc('id')->first();
+        $recoverable = $server->status === Server::STATUS_SWITCHING_GAME
+            || ($latestOperation && $latestOperation->state === GameSwitchOperation::STATE_FAILED_REQUIRES_ACTION);
 
         return $this->fractal->collection($slots)
             ->transformWith($this->getTransformer(GameSlotTransformer::class))
@@ -58,8 +96,15 @@ class GameSlotController extends ClientApiController
                 'slot_count' => $slots->count(),
                 'server_disk_bytes' => $server->disk * 1024 * 1024,
                 'combined_slot_usage_bytes' => (int) $slots->sum('disk_usage_bytes'),
+                'is_switching' => $server->status === Server::STATUS_SWITCHING_GAME,
+                'recoverable' => $recoverable,
                 'active_operation' => $activeOperation
                     ? $this->fractal->item($activeOperation)
+                        ->transformWith($this->getTransformer(GameSwitchOperationTransformer::class))
+                        ->toArray()['data']
+                    : null,
+                'latest_operation' => $latestOperation
+                    ? $this->fractal->item($latestOperation)
                         ->transformWith($this->getTransformer(GameSwitchOperationTransformer::class))
                         ->toArray()['data']
                     : null,

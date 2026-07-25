@@ -9,6 +9,9 @@ import { ServerContext } from '@/state/server';
  * backend is the source of truth, so leaving and returning to the page always
  * resumes correctly.
  */
+// Poll only while a switch is actually in progress; the caller flips `poll` off
+// once the operation reaches a terminal state so a completed or failed switch is
+// always reflected without hammering the API.
 export default (poll = false) => {
     const uuid = ServerContext.useStoreState((state) => state.server.data!.uuid);
 

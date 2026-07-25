@@ -167,6 +167,127 @@ class GameSwitchRecoveryService
     }
 
     /**
+     * Self-healing pass run whenever the game slots page loads. If the server is
+     * flagged as switching but no operation is actually live (the worker died,
+     * the request was killed, or a transient left the flag set), the switch is
+     * not really happening — quietly return the server to normal and guarantee a
+     * single active slot. Safe by construction: it only ever runs when there is
+     * no pending/running operation to disturb.
+     */
+    public function healStaleState(Server $server): bool
+    {
+        if ($server->status !== Server::STATUS_SWITCHING_GAME) {
+            // Still guarantee exactly one active slot even when not switching, so
+            // a half-finished commit never leaves the page without an active game.
+            return $this->ensureSingleActiveSlot($server);
+        }
+
+        $liveOperation = GameSwitchOperation::query()
+            ->where('server_id', $server->id)
+            ->whereIn('state', GameSwitchOperation::ACTIVE_STATES)
+            ->exists();
+
+        if ($liveOperation) {
+            return false;
+        }
+
+        $this->connection->transaction(function () use ($server) {
+            $locked = Server::query()->lockForUpdate()->findOrFail($server->id);
+
+            // Re-check under the lock: a switch may have started between the read
+            // above and acquiring the lock.
+            $stillLive = GameSwitchOperation::query()
+                ->where('server_id', $locked->id)
+                ->whereIn('state', GameSwitchOperation::ACTIVE_STATES)
+                ->exists();
+            if (!$stillLive && $locked->status === Server::STATUS_SWITCHING_GAME) {
+                $locked->forceFill(['status' => null])->save();
+            }
+
+            $this->ensureSingleActiveSlot($locked);
+        });
+
+        $server->refresh();
+
+        return true;
+    }
+
+    /**
+     * Owner-triggered "get me unstuck" action. Clears any lingering operation
+     * lock, returns the server to normal, and guarantees a single active slot —
+     * without ever moving files. This is the escape hatch for a broken database
+     * state so a user is never permanently stranded waiting on a dead switch.
+     */
+    public function resetForServer(Server $server): void
+    {
+        $this->connection->transaction(function () use ($server) {
+            $locked = Server::query()->lockForUpdate()->findOrFail($server->id);
+
+            GameSwitchOperation::query()
+                ->where('server_id', $locked->id)
+                ->whereIn('state', GameSwitchOperation::ACTIVE_STATES)
+                ->update([
+                    'state' => GameSwitchOperation::STATE_FAILED_REQUIRES_ACTION,
+                    'lock_marker' => null,
+                    'error_code' => 'reset_by_user',
+                    'error_message' => 'The switch was reset. Your game files are all safe — nothing was deleted.',
+                ]);
+
+            if ($locked->status === Server::STATUS_SWITCHING_GAME) {
+                $locked->forceFill(['status' => null])->save();
+            }
+
+            $this->ensureSingleActiveSlot($locked);
+        });
+
+        try {
+            $this->daemonServerRepository->setServer($server->refresh())->sync();
+        } catch (\Throwable) {
+            // Best effort; Wings re-pulls config on next boot regardless.
+        }
+    }
+
+    /**
+     * Guarantee the server has exactly one active slot. When a commit was
+     * interrupted the volume can hold a slot's files with nothing marked active;
+     * pick the most sensible slot (the one last activated, else the earliest)
+     * and pin it in the database. Returns whether any change was made. Never
+     * touches files.
+     */
+    private function ensureSingleActiveSlot(Server $server): bool
+    {
+        $slots = $server->gameSlots()->get();
+        if ($slots->isEmpty()) {
+            return false;
+        }
+
+        $active = $slots->where('is_active', true);
+        if ($active->count() === 1) {
+            return false;
+        }
+
+        // Prefer the slot most recently activated; fall back to the oldest slot
+        // so a brand-new server still ends up with a defined active game.
+        $chosen = $slots->sortByDesc(fn (GameSlot $slot) => $slot->last_activated_at?->getTimestamp() ?? 0)
+            ->sortByDesc('is_active')
+            ->first();
+
+        $this->connection->transaction(function () use ($server, $chosen) {
+            $server->gameSlots()->update(['is_active' => false, 'active_marker' => null]);
+
+            $fresh = GameSlot::query()->lockForUpdate()->findOrFail($chosen->id);
+            $fresh->forceFill([
+                'is_active' => true,
+                'active_marker' => $server->id,
+                'state' => $fresh->state === GameSlot::STATE_RECOVERY_REQUIRED ? GameSlot::STATE_NORMAL : $fresh->state,
+                'last_activated_at' => $fresh->last_activated_at ?? now(),
+            ])->save();
+        });
+
+        return true;
+    }
+
+    /**
      * Assemble a diagnostic snapshot comparing database state to node state so
      * an administrator can decide how to recover.
      */

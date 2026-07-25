@@ -22,7 +22,7 @@ class ManagedSubdomainReconciliationService
         private DnsTargetResolver $targetResolver,
         private DnsRecordPlanner $recordPlanner,
         private DnsProviderFactory $providerFactory,
-        private HttpServiceDetector $httpDetector,
+        private AllocationServiceDetector $serviceDetector,
     ) {
     }
 
@@ -67,12 +67,12 @@ class ManagedSubdomainReconciliationService
                     $target = $this->targetResolver->resolve($managed->allocation, $managed->domain);
                     $reverseProxyTarget = $this->targetResolver->resolveForReverseProxy($managed->allocation);
 
-                    // Re-probe the port over HTTP to decide reverse proxy vs plain
-                    // DNS, and only look up an SRV target for a non-web egg that
-                    // supports it. The planner falls back to a working record in
-                    // every other case, so reconciliation never dead-ends here.
-                    $webScheme = $this->httpDetector->detect($target, $managed->allocation->port);
-                    $srvTarget = (!$webScheme && $profile->supports_srv)
+                    // Re-probe the port (HTTP → website; else Minecraft handshake
+                    // → SRV) so a subdomain follows the service if it changes. The
+                    // planner falls back to a working record in every other case,
+                    // so reconciliation never dead-ends here.
+                    $detected = $this->serviceDetector->detect($managed->allocation);
+                    $srvTarget = $detected->isMinecraftJava()
                         ? $this->targetResolver->resolveForSrv($managed->allocation)
                         : null;
 
@@ -83,8 +83,8 @@ class ManagedSubdomainReconciliationService
                         $profile,
                         $target,
                         $reverseProxyTarget,
-                        $webScheme,
-                        null,
+                        $detected->isHttp() ? 'http' : null,
+                        $detected->isMinecraftJava(),
                         $srvTarget,
                     );
                     $publicTarget = $plan->accessMethod === DnsRecordPlan::ACCESS_PROXY

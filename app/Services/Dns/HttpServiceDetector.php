@@ -3,12 +3,15 @@
 namespace Pterodactyl\Services\Dns;
 
 use Illuminate\Http\Client\Factory;
-use Illuminate\Contracts\Cache\Repository;
-use Pterodactyl\Services\Dns\Results\DnsTarget;
+use Illuminate\Contracts\Cache\Repository as Cache;
+use Illuminate\Contracts\Config\Repository as Config;
 
 /**
- * Detects whether an allocation is serving HTTP without relying on a list of
- * eggs, plugins, or conventional web ports.
+ * Detects whether a service is serving HTTP by actually connecting to the port
+ * — the equivalent of `curl http://host:port/`. It does not rely on a list of
+ * eggs, plugins, or conventional web ports. Several candidate hosts are tried
+ * (the allocation's own IP, then the node's public address) so detection works
+ * whether the panel reaches the service directly or through the node's edge.
  */
 class HttpServiceDetector
 {
@@ -16,34 +19,45 @@ class HttpServiceDetector
 
     public function __construct(
         private Factory $http,
-        private Repository $cache,
+        private Cache $cache,
+        private Config $config,
     ) {
     }
 
     /**
-     * Returns the origin scheme when the target responds as an HTTP server.
+     * Returns 'http' when any candidate host answers as an HTTP server.
+     *
+     * @param string[] $hosts
      */
-    public function detect(DnsTarget $target, int $port): ?string
+    public function detect(array $hosts, int $port): ?string
     {
-        $key = sprintf(
-            'managed-dns:http-service:%s',
-            hash('sha256', sprintf('%s:%s:%d', $target->recordType, $target->value, $port)),
-        );
+        foreach ($hosts as $host) {
+            $key = sprintf('managed-dns:http-service:%s', hash('sha256', sprintf('%s:%d', $host, $port)));
 
-        if ($this->cache->has($key)) {
-            $cached = $this->cache->get($key);
+            if ($this->cache->has($key)) {
+                $cached = $this->cache->get($key);
+                if (in_array($cached, ['http', 'https'], true)) {
+                    return $cached;
+                }
 
-            return in_array($cached, ['http', 'https'], true) ? $cached : null;
+                continue;
+            }
+
+            $scheme = $this->probe($host, $port);
+            $this->cache->put(
+                $key,
+                $scheme ?? self::NO_HTTP,
+                $scheme
+                    ? (int) $this->config->get('managed-dns.http_detection.positive_ttl', 300)
+                    : (int) $this->config->get('managed-dns.http_detection.negative_ttl', 30),
+            );
+
+            if ($scheme) {
+                return $scheme;
+            }
         }
 
-        $scheme = $this->probe($target->value, $port);
-        $ttl = $scheme
-            ? (int) config('managed-dns.http_detection.positive_ttl', 300)
-            : (int) config('managed-dns.http_detection.negative_ttl', 30);
-
-        $this->cache->put($key, $scheme ?? self::NO_HTTP, $ttl);
-
-        return $scheme;
+        return null;
     }
 
     private function probe(string $target, int $port): ?string
@@ -53,17 +67,17 @@ class HttpServiceDetector
             : $target;
 
         try {
-            // Match a literal `curl http://host:port/`: use GET, let the target
-            // provide its normal Host handling, and stream the body so a map or
-            // other large page is not downloaded into panel memory.
+            // Behave like a plain `curl http://host:port/`: GET, no redirects
+            // followed, and only pull the first kilobyte so a large page (a map,
+            // a file listing) is never read into panel memory.
             $this->http
                 ->withOptions([
                     'allow_redirects' => false,
                     'http_errors' => false,
                     'stream' => true,
                 ])
-                ->connectTimeout((float) config('managed-dns.http_detection.connect_timeout', 1))
-                ->timeout((float) config('managed-dns.http_detection.timeout', 2))
+                ->connectTimeout((float) $this->config->get('managed-dns.http_detection.connect_timeout', 1))
+                ->timeout((float) $this->config->get('managed-dns.http_detection.timeout', 2))
                 ->withHeaders([
                     'Accept' => 'text/html,application/xhtml+xml,*/*;q=0.8',
                     'Range' => 'bytes=0-1023',
@@ -71,12 +85,12 @@ class HttpServiceDetector
                 ])
                 ->get(sprintf('http://%s:%d/', $host, $port));
 
-            // A response with any HTTP status proves that this is an HTTP
-            // service; redirects and errors are still valid web responses.
+            // Any HTTP response — including a redirect or an error status —
+            // proves something is speaking HTTP on this port.
             return 'http';
         } catch (\Throwable) {
-            // A connection or protocol failure lets the next detector try the
-            // port before record planning falls back to direct DNS.
+            // A connection or protocol failure just means this candidate is not
+            // an HTTP server; the caller moves on to the next host/detector.
         }
 
         return null;
