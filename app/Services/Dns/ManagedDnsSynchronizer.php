@@ -249,6 +249,11 @@ class ManagedDnsSynchronizer
                 ->subject($managed)
                 ->property('fqdn', $managed->fqdn)
                 ->log();
+
+            // Provider cleanup has completed, so release the local ownership
+            // record as well. The database cascades this deletion to the
+            // managed DNS records and synchronization attempts.
+            $managed->deleteOrFail();
         } catch (\Throwable $exception) {
             $code = $exception instanceof DnsProviderException ? $exception->providerErrorCode : 'deletion_failed';
             $managed->forceFill([

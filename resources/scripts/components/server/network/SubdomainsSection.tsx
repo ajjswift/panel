@@ -12,6 +12,7 @@ import Spinner from '@/components/elements/Spinner';
 import CopyOnClick from '@/components/elements/CopyOnClick';
 import { ServerContext } from '@/state/server';
 import useFlash, { useFlashKey } from '@/plugins/useFlash';
+import { httpErrorToHuman } from '@/api/http';
 import {
     createManagedSubdomain,
     deleteManagedSubdomain,
@@ -91,6 +92,7 @@ const AddressFormDialog = ({ open, editing, onClose, onSaved }: AddressForm) => 
     const [domainUuid, setDomainUuid] = useState('');
     const [allocationId, setAllocationId] = useState<number>(allocations[0]?.id || 0);
     const [preview, setPreview] = useState<ManagedSubdomainPreview | null>(null);
+    const [previewError, setPreviewError] = useState<string | null>(null);
     const [previewing, setPreviewing] = useState(false);
     const [saving, setSaving] = useState(false);
     const previewTimer = useRef<number>();
@@ -102,6 +104,7 @@ const AddressFormDialog = ({ open, editing, onClose, onSaved }: AddressForm) => 
         setAllocationId(editing?.allocation?.id ?? allocations[0]?.id ?? 0);
         setDomainUuid(editing?.domain.uuid ?? domains[0]?.uuid ?? '');
         setPreview(null);
+        setPreviewError(null);
     }, [open]);
 
     useEffect(() => {
@@ -113,19 +116,35 @@ const AddressFormDialog = ({ open, editing, onClose, onSaved }: AddressForm) => 
 
     // Live preview: quietly ask the backend what the address will look like.
     useEffect(() => {
+        let active = true;
         window.clearTimeout(previewTimer.current);
         setPreview(null);
+        setPreviewError(null);
+        setPreviewing(false);
         if (!open || !label || !domainUuid || !allocationId) return;
 
         previewTimer.current = window.setTimeout(() => {
             setPreviewing(true);
             previewManagedSubdomain(uuid, { label, domainUuid, allocationId })
-                .then(setPreview)
-                .catch(() => setPreview(null))
-                .then(() => setPreviewing(false));
+                .then((result) => active && setPreview(result))
+                .catch((error) => {
+                    if (!active) return;
+                    setPreview(null);
+
+                    // The preview endpoint sees the address being edited as
+                    // already owned. Suppress that self-conflict, but surface
+                    // genuine conflicts (and other preview failures) inline.
+                    if (!editing || `${label}.${suffix}` !== editing.fqdn) {
+                        setPreviewError(httpErrorToHuman(error));
+                    }
+                })
+                .then(() => active && setPreviewing(false));
         }, 500);
 
-        return () => window.clearTimeout(previewTimer.current);
+        return () => {
+            active = false;
+            window.clearTimeout(previewTimer.current);
+        };
     }, [label, domainUuid, allocationId, open]);
 
     const submit = () => {
@@ -177,6 +196,7 @@ const AddressFormDialog = ({ open, editing, onClose, onSaved }: AddressForm) => 
                                 maxLength={63}
                                 placeholder={'myserver'}
                                 onChange={(e) => setName(e.currentTarget.value)}
+                                hasError={!!previewError}
                                 className={'flex-1'}
                             />
                             {domains.length > 1 ? (
@@ -229,6 +249,10 @@ const AddressFormDialog = ({ open, editing, onClose, onSaved }: AddressForm) => 
                             <p className={'text-sm text-body-muted flex items-center gap-2'}>
                                 <FontAwesomeIcon icon={faCircleNotch} spin className={'w-3.5 h-3.5'} />
                                 Checking…
+                            </p>
+                        ) : previewError ? (
+                            <p role={'alert'} className={'text-sm text-danger-text'}>
+                                {previewError}
                             </p>
                         ) : preview ? (
                             <>
