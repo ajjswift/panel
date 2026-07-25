@@ -2,7 +2,7 @@
 
 namespace Pterodactyl\Tests\Unit\Services\Dns;
 
-use PHPUnit\Framework\TestCase;
+use Pterodactyl\Tests\TestCase;
 use Illuminate\Http\Client\Factory;
 use Pterodactyl\Models\ManagedDomain;
 use Pterodactyl\Services\Dns\CloudflareDnsProvider;

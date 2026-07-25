@@ -3,7 +3,7 @@
 namespace Pterodactyl\Tests\Unit\Services\Dns;
 
 use Pterodactyl\Models\Node;
-use PHPUnit\Framework\TestCase;
+use Pterodactyl\Tests\TestCase;
 use Pterodactyl\Models\Allocation;
 use Pterodactyl\Models\ManagedDomain;
 use Pterodactyl\Exceptions\DisplayException;

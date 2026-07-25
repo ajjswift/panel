@@ -2,7 +2,7 @@
 
 namespace Pterodactyl\Tests\Unit\Services\Dns;
 
-use PHPUnit\Framework\TestCase;
+use Pterodactyl\Tests\TestCase;
 use Illuminate\Cache\ArrayStore;
 use Illuminate\Cache\Repository;
 use Illuminate\Http\Client\Factory;

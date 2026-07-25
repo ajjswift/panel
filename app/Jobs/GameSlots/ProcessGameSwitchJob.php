@@ -311,7 +311,26 @@ class ProcessGameSwitchJob implements ShouldQueue
             'lock_marker' => null,
         ])->save();
 
-        ReconcileServerManagedDnsJob::dispatch($this->server->id);
+        $this->reconcileManagedDns();
+    }
+
+    /**
+     * Re-plan managed DNS now the active game (and therefore its DNS service
+     * profile) may have changed. This is best-effort: the switch is already
+     * committed, so a DNS provider hiccup must never fail or reverse it. On the
+     * synchronous dev queue the reconcile runs inline, which is exactly where an
+     * unguarded provider exception would otherwise surface the switch as failed.
+     */
+    private function reconcileManagedDns(): void
+    {
+        try {
+            ReconcileServerManagedDnsJob::dispatch($this->server->id);
+        } catch (\Throwable $exception) {
+            Log::warning('Managed DNS reconcile after a game switch failed; the switch itself is unaffected.', [
+                'server' => $this->server->uuid,
+                'exception' => $exception->getMessage(),
+            ]);
+        }
     }
 
     private function handleFailure(\Throwable $exception): void
@@ -342,7 +361,7 @@ class ProcessGameSwitchJob implements ShouldQueue
                 'internal_error_context' => $context,
             ])->save();
 
-            ReconcileServerManagedDnsJob::dispatch($this->server->id);
+            $this->reconcileManagedDns();
 
             return;
         }

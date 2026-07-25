@@ -17,7 +17,7 @@ class ManagedSubdomainPreviewService
         private DnsTargetResolver $targetResolver,
         private DnsRecordPlanner $recordPlanner,
         private ManagedHostnameAvailabilityService $availabilityService,
-        private AllocationServiceDetector $allocationServiceDetector,
+        private HttpServiceDetector $httpDetector,
     ) {
     }
 
@@ -61,16 +61,16 @@ class ManagedSubdomainPreviewService
 
         $target = $this->targetResolver->resolve($allocation, $domain);
         $reverseProxyTarget = $this->targetResolver->resolveForReverseProxy($allocation);
-        $detected = $this->allocationServiceDetector->detect($target, $allocation->port);
-        if ($detected->isHttp() && !$reverseProxyTarget) {
-            throw new DisplayException('A website was detected on this port, but reverse proxying is not configured for its node. Ask an administrator to enable the node reverse proxy first.');
-        }
-        $srvTarget = $detected->isMinecraftJava()
+
+        // One HTTP request to the port decides the routing: if it answers as a
+        // website it goes through the node's reverse proxy for a clean, port-free
+        // address; otherwise it stays on plain DNS. An SRV record is only worth
+        // resolving for a non-web game whose egg advertises SRV support. Nothing
+        // here blocks creation — the planner always produces a working record.
+        $webScheme = $this->httpDetector->detect($target, $allocation->port);
+        $srvTarget = (!$webScheme && $profile->supports_srv)
             ? $this->targetResolver->resolveForSrv($allocation)
             : null;
-        if ($detected->isMinecraftJava() && (!$domain->supports_srv || !$srvTarget)) {
-            throw new DisplayException('A Minecraft server was detected on this port, but an SRV record cannot be created for this domain and node. Ask an administrator to configure a public node hostname and enable SRV records.');
-        }
 
         $plan = $this->recordPlanner->build(
             $fqdn,
@@ -79,13 +79,16 @@ class ManagedSubdomainPreviewService
             $profile,
             $target,
             $reverseProxyTarget,
-            $detected->isHttp() ? 'http' : null,
-            $detected->isMinecraftJava(),
+            $webScheme,
+            null,
             $srvTarget,
         );
         $publicTarget = $plan->accessMethod === DnsRecordPlan::ACCESS_PROXY
             ? ($reverseProxyTarget ?? $target)
             : $target;
+        $detectedService = $plan->webDetectionSource === 'http_probe'
+            ? 'Website'
+            : ($plan->minecraftDetected ? 'Minecraft Java' : $profile->name);
 
         return [
             'label' => $label,
@@ -107,7 +110,7 @@ class ManagedSubdomainPreviewService
                 'detection_source' => $source,
                 'supports_srv' => $profile->supports_srv,
             ],
-            'detected_service' => $detected->type,
+            'detected_service' => $detectedService,
             'record_plan' => $plan->toArray(),
         ];
     }

@@ -3,14 +3,19 @@
 namespace Pterodactyl\Tests\Integration\Jobs\GameSlots;
 
 use Ramsey\Uuid\Uuid;
+use Illuminate\Support\Str;
 use Pterodactyl\Models\Server;
 use Pterodactyl\Models\GameSlot;
+use Illuminate\Support\Facades\Crypt;
+use Pterodactyl\Models\ManagedDomain;
+use Pterodactyl\Models\ManagedSubdomain;
 use Pterodactyl\Models\GameSwitchOperation;
 use Pterodactyl\Jobs\GameSlots\ProcessGameSwitchJob;
 use Pterodactyl\Tests\Integration\IntegrationTestCase;
 use Pterodactyl\Repositories\Wings\DaemonPowerRepository;
 use Pterodactyl\Repositories\Wings\DaemonServerRepository;
 use Pterodactyl\Services\GameSlots\GameSlotStorageService;
+use Pterodactyl\Services\Dns\ManagedSubdomainReconciliationService;
 
 class ProcessGameSwitchJobTest extends IntegrationTestCase
 {
@@ -20,6 +25,8 @@ class ProcessGameSwitchJobTest extends IntegrationTestCase
         // models this test creates so shared-database runs stay isolated.
         GameSwitchOperation::query()->forceDelete();
         GameSlot::query()->forceDelete();
+        ManagedSubdomain::query()->forceDelete();
+        ManagedDomain::query()->forceDelete();
         Server::query()->forceDelete();
 
         parent::tearDown();
@@ -57,6 +64,41 @@ class ProcessGameSwitchJobTest extends IntegrationTestCase
         ]);
 
         return [$server, $source, $destination, $operation];
+    }
+
+    private function attachManagedSubdomain(Server $server): ManagedSubdomain
+    {
+        $domain = ManagedDomain::query()->create([
+            'uuid' => Uuid::uuid4()->toString(),
+            'name' => 'Switch ' . Str::random(4),
+            'domain' => Str::lower(Str::random(8)) . '.example.com',
+            'provider' => 'cloudflare',
+            'zone_id' => str_repeat('a', 32),
+            'api_token' => Crypt::encrypt('token'),
+            'enabled' => true,
+            'ttl' => 300,
+            'label_pattern' => '^[a-z0-9-]+$',
+        ]);
+
+        return ManagedSubdomain::query()->create([
+            'uuid' => Uuid::uuid4()->toString(),
+            'server_id' => $server->id,
+            'allocation_id' => $server->allocation_id,
+            'managed_domain_id' => $domain->id,
+            'dns_service_profile_id' => null,
+            'label' => 'play',
+            'fqdn' => 'play.' . $domain->domain,
+            'routing_mode' => 'direct_dns',
+            'detected_service' => 'Minecraft Java',
+            'service_detection_source' => 'profile',
+            'status' => 'active',
+            'desired_state_version' => 1,
+            'public_target_type' => 'A',
+            'public_target' => '203.0.113.10',
+            'target_port' => 25565,
+            'connection_address' => 'play.' . $domain->domain,
+            'desired_record_plan' => ['records' => [], 'access_method' => 'clean'],
+        ]);
     }
 
     private function mockDependencies(bool $stashThrows = false): array
@@ -137,6 +179,33 @@ class ProcessGameSwitchJobTest extends IntegrationTestCase
 
         $operation->refresh();
         $this->assertSame(GameSwitchOperation::STATE_COMPLETED, $operation->state);
+    }
+
+    public function testDnsReconcileFailureDoesNotFailACommittedSwitch(): void
+    {
+        // On the synchronous queue the post-switch DNS reconcile runs inline, so
+        // a DNS provider failure used to bubble up and surface a completed switch
+        // as failed. The reconcile is now best-effort and must never do that.
+        config(['queue.default' => 'sync']);
+
+        [$server, $source, $destination, $operation] = $this->makeServerWithSlots();
+        $this->attachManagedSubdomain($server);
+
+        $reconciler = \Mockery::mock(ManagedSubdomainReconciliationService::class);
+        $reconciler->shouldReceive('reconcile')->andThrow(new \RuntimeException('simulated DNS provider outage'));
+        $this->app->instance(ManagedSubdomainReconciliationService::class, $reconciler);
+
+        [$power, $daemon, $storage] = $this->mockDependencies();
+
+        (new ProcessGameSwitchJob($operation->id))->handle($power, $daemon, $storage);
+
+        $operation->refresh();
+        $destination->refresh();
+        $server->refresh();
+
+        $this->assertSame(GameSwitchOperation::STATE_COMPLETED, $operation->state);
+        $this->assertTrue($destination->is_active);
+        $this->assertNull($server->status);
     }
 
     public function testResumesFromCommittedCheckpointWithoutRollback(): void
