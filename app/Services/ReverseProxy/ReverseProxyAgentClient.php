@@ -29,7 +29,7 @@ class ReverseProxyAgentClient
     public function syncRoutes(Node $node, array $routes): array
     {
         try {
-            $response = $this->client($node)->put('/routes', ['json' => ['routes' => array_values($routes)]]);
+            $response = $this->client($node)->put('routes', ['json' => ['routes' => array_values($routes)]]);
         } catch (TransferException $exception) {
             throw new DaemonConnectionException($exception);
         }
@@ -43,7 +43,7 @@ class ReverseProxyAgentClient
     public function health(Node $node): array
     {
         try {
-            $response = $this->client($node)->get('/health');
+            $response = $this->client($node)->get('health');
         } catch (TransferException $exception) {
             throw new DaemonConnectionException($exception);
         }
