@@ -25,37 +25,7 @@ import {
     repairManagedSubdomain,
     updateManagedSubdomain,
 } from '@/api/server/network/managedSubdomains';
-
-const settingUp = ['pending', 'creating', 'updating'];
-
-type Tone = 'ok' | 'busy' | 'attention';
-
-// Translate a record's raw status into plain-language state a non-technical
-// player understands. Reverse-proxied addresses go through extra stages
-// (DNS → certificate → live) reported by the node, so they get their own
-// friendlier wording. Never relies on color alone — each state has a label.
-const friendlyStatus = (record: ManagedSubdomain): { label: string; tone: Tone; hint: string } => {
-    const status = record.status;
-
-    if (record.routingMode === 'reverse_proxy' && !['deleting', 'failed', 'repair_required'].includes(status)) {
-        if (record.proxyStatus === 'active') return { label: 'Ready', tone: 'ok', hint: '' };
-        if (record.proxyStatus === 'failed' || record.proxyCertStatus === 'failed') {
-            return { label: 'Needs attention', tone: 'attention', hint: '' };
-        }
-        if (record.proxyCertStatus === 'issuing') {
-            return { label: 'Getting security certificate…', tone: 'busy', hint: 'This can take a minute or two.' };
-        }
-        if (record.proxyDnsStatus && record.proxyDnsStatus !== 'ok') {
-            return { label: 'Waiting for DNS…', tone: 'busy', hint: 'DNS changes can take a few minutes to spread.' };
-        }
-        return { label: 'Setting up…', tone: 'busy', hint: 'This usually takes a minute or two.' };
-    }
-
-    if (status === 'active') return { label: 'Ready', tone: 'ok', hint: '' };
-    if (settingUp.includes(status)) return { label: 'Setting up…', tone: 'busy', hint: 'This usually takes under a minute.' };
-    if (status === 'deleting') return { label: 'Removing…', tone: 'busy', hint: '' };
-    return { label: 'Needs attention', tone: 'attention', hint: '' };
-};
+import { friendlyStatus, settingUp } from '@/components/server/network/managedSubdomainStatus';
 
 const toneChip: Record<'ok' | 'busy' | 'attention', string> = {
     ok: 'bg-success/10 text-success-text',
@@ -298,10 +268,7 @@ const SubdomainsSection = () => {
         revalidateOnFocus: false,
     });
 
-    const hasBusy = useMemo(
-        () => (records.data || []).some((r) => [...settingUp, 'deleting'].includes(r.status)),
-        [records.data]
-    );
+    const hasBusy = useMemo(() => (records.data || []).some((r) => friendlyStatus(r).tone === 'busy'), [records.data]);
 
     useEffect(() => {
         clearAndAddHttpError(overview.error || records.error);
@@ -323,11 +290,12 @@ const SubdomainsSection = () => {
         const prev = lastStates.current;
         const next: Record<string, string> = {};
         records.data.forEach((r) => {
-            next[r.uuid] = r.status;
+            const state = friendlyStatus(r);
+            next[r.uuid] = state.tone;
             const was = prev[r.uuid];
-            if (was && settingUp.includes(was) && r.status === 'active') {
+            if (was && was !== 'ok' && state.tone === 'ok') {
                 addFlash({ key: 'server:network', type: 'success', title: 'Address ready', message: `${r.fqdn} is live.` });
-            } else if (was && settingUp.includes(was) && friendlyStatus(r).tone === 'attention') {
+            } else if (was && was !== 'attention' && state.tone === 'attention') {
                 addFlash({
                     key: 'server:network',
                     type: 'error',
