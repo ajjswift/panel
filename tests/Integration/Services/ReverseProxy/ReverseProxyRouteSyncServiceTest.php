@@ -61,7 +61,7 @@ class ReverseProxyRouteSyncServiceTest extends IntegrationTestCase
             'id' => $managed->uuid,
             'hostname' => $managed->fqdn,
             'expected_ip' => '203.0.113.10',
-            'target_host' => '127.0.0.1',
+            'target_host' => $server->node->fqdn,
             'target_port' => 8123,
             'target_scheme' => 'http',
         ]], $service->buildRoutes($server->node->fresh()));

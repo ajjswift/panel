@@ -50,8 +50,8 @@ class ReverseProxyRouteSyncService
                 'hostname' => $s->fqdn,
                 // The public IP the hostname should resolve to (this node).
                 'expected_ip' => $node->dns_target_ipv4 ?: $s->public_target,
-                // The agent forwards to the service running locally on the node.
-                'target_host' => '127.0.0.1',
+                // The agent forwards to the service running on the node.
+                'target_host' => $node->fqdn,
                 'target_port' => $s->target_port,
                 'target_scheme' => $s->desired_record_plan['proxy_target_scheme'] ?? 'http',
             ])
