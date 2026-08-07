@@ -56,7 +56,7 @@ class AllocationRepository extends EloquentRepository implements AllocationRepos
     /**
      * Return a single allocation from those meeting the requirements.
      */
-    public function getRandomAllocation(array $nodes, array $ports, bool $dedicated = false): ?Allocation
+    public function getRandomAllocation(array $nodes, array $ports, bool $dedicated = false, int $required = 1): ?Allocation
     {
         $query = Allocation::query()->whereNull('server_id');
 
@@ -93,6 +93,13 @@ class AllocationRepository extends EloquentRepository implements AllocationRepos
                     $discard
                 );
             }
+        }
+
+        if ($required > 1) {
+            $query->whereRaw(sprintf(
+                '(SELECT COUNT(*) FROM allocations AS required_allocations WHERE required_allocations.node_id = allocations.node_id AND required_allocations.server_id IS NULL%s) >= ?',
+                $dedicated ? ' AND required_allocations.ip = allocations.ip' : ''
+            ), [$required]);
         }
 
         return $query->inRandomOrder()->first();

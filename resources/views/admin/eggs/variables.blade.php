@@ -67,6 +67,11 @@
                             </div>
                         </div>
                         <div class="form-group">
+                            <label class="form-label">Assigned Port Number</label>
+                            <input type="number" min="1" max="{{ $egg->initial_allocation_count }}" name="allocation_index" value="{{ $variable->allocation_index }}" class="form-control" placeholder="Not assigned" />
+                            <p class="text-muted small">Optional. During server creation this variable is filled with the selected port at this position. Port 1 is the primary allocation.</p>
+                        </div>
+                        <div class="form-group">
                             <label class="form-label">Permissions</label>
                             <select name="options[]" class="pOptions form-control" multiple>
                                 <option value="user_viewable" {{ (! $variable->user_viewable) ?: 'selected' }}>Users Can View</option>
@@ -118,6 +123,11 @@
                         <div class="col-xs-12">
                             <p class="text-muted small">This variable can be accessed in the startup command by entering <code>@{{environment variable value}}</code>.</p>
                         </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="control-label">Assigned Port Number</label>
+                        <input type="number" min="1" max="{{ $egg->initial_allocation_count }}" name="allocation_index" class="form-control" value="{{ old('allocation_index') }}" placeholder="Not assigned" />
+                        <p class="text-muted small">Optional. During server creation this variable is filled with the selected port at this position. Port 1 is the primary allocation.</p>
                     </div>
                     <div class="form-group">
                         <label class="control-label">Permissions</label>

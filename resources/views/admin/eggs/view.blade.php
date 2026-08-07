@@ -87,6 +87,11 @@
                                 </p>
                             </div>
                             <div class="form-group">
+                                <label for="pInitialAllocationCount" class="control-label">Initial Port Count</label>
+                                <input type="number" min="1" max="65535" id="pInitialAllocationCount" name="initial_allocation_count" value="{{ $egg->initial_allocation_count }}" class="form-control" />
+                                <p class="text-muted small">The minimum number of ports assigned when a server is created. Port 1 is the primary allocation; additional ports are selected automatically.</p>
+                            </div>
+                            <div class="form-group">
                                 <div class="checkbox checkbox-primary no-margin-bottom">
                                     <input id="pForceOutgoingIp" name="force_outgoing_ip" type="checkbox" value="1" @if($egg->force_outgoing_ip) checked @endif />
                                     <label for="pForceOutgoingIp" class="strong">Force Outgoing IP</label>

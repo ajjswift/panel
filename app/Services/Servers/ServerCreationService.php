@@ -21,6 +21,7 @@ use Pterodactyl\Services\Deployment\FindViableNodesService;
 use Pterodactyl\Repositories\Eloquent\ServerVariableRepository;
 use Pterodactyl\Services\Deployment\AllocationSelectionService;
 use Pterodactyl\Exceptions\Http\Connection\DaemonConnectionException;
+use Pterodactyl\Exceptions\Service\Deployment\NoViableAllocationException;
 
 class ServerCreationService
 {
@@ -50,14 +51,17 @@ class ServerCreationService
      * @throws \Illuminate\Validation\ValidationException
      * @throws \Pterodactyl\Exceptions\Repository\RecordNotFoundException
      * @throws \Pterodactyl\Exceptions\Service\Deployment\NoViableNodeException
-     * @throws \Pterodactyl\Exceptions\Service\Deployment\NoViableAllocationException
+     * @throws NoViableAllocationException
      */
     public function handle(array $data, ?DeploymentObject $deployment = null): Server
     {
+        Assert::false(empty($data['egg_id']), 'Expected a non-empty egg_id in server creation data.');
+        $egg = Egg::query()->with('variables')->findOrFail(Arr::get($data, 'egg_id'));
+
         // If a deployment object has been passed we need to get the allocation
         // that the server should use, and assign the node from that allocation.
         if ($deployment instanceof DeploymentObject) {
-            $allocation = $this->configureDeployment($data, $deployment);
+            $allocation = $this->configureDeployment($data, $deployment, $egg->initial_allocation_count);
             $data['allocation_id'] = $allocation->id;
             $data['node_id'] = $allocation->node_id;
         }
@@ -71,16 +75,9 @@ class ServerCreationService
         }
 
         if (empty($data['nest_id'])) {
-            Assert::false(empty($data['egg_id']), 'Expected a non-empty egg_id in server creation data.');
-
-            $data['nest_id'] = Egg::query()->findOrFail($data['egg_id'])->nest_id;
+            $data['nest_id'] = $egg->nest_id;
         }
 
-        $eggVariableData = $this->validatorService
-            ->setUserLevel(User::USER_LEVEL_ADMIN)
-            ->handle(Arr::get($data, 'egg_id'), Arr::get($data, 'environment', []));
-
-        $egg = Egg::query()->findOrFail(Arr::get($data, 'egg_id'));
         if (
             Arr::get($data, 'subdomain_policy', SubdomainPolicy::Inherit->value) === SubdomainPolicy::Enabled->value
             && $egg->subdomain_compatibility !== SubdomainCompatibility::Compatible->value
@@ -108,7 +105,17 @@ class ServerCreationService
         // If that connection fails out we will attempt to perform a cleanup by just
         // deleting the server itself from the system.
         /** @var Server $server */
-        $server = $this->connection->transaction(function () use ($data, $eggVariableData) {
+        $server = $this->connection->transaction(function () use ($data, $egg, $deployment) {
+            $data = $this->configureInitialAllocations(
+                $egg,
+                $data,
+                $deployment instanceof DeploymentObject && $deployment->isDedicated()
+            );
+
+            $eggVariableData = $this->validatorService
+                ->setUserLevel(User::USER_LEVEL_ADMIN)
+                ->handle($egg->id, Arr::get($data, 'environment', []));
+
             // Create the server and assign any additional allocations to it.
             $server = $this->createModel($data);
 
@@ -132,13 +139,106 @@ class ServerCreationService
     }
 
     /**
+     * Ensure that a new server has the minimum number of allocations required by its egg and
+     * copy mapped allocation ports into the corresponding egg environment variables.
+     *
+     * Allocation indexes on egg variables are one-based: index 1 is the primary allocation,
+     * while indexes 2 and above refer to additional allocations in assignment order.
+     *
+     * @throws NoViableAllocationException
+     */
+    private function configureInitialAllocations(Egg $egg, array $data, bool $dedicated): array
+    {
+        $required = max(1, $egg->initial_allocation_count);
+        $primaryId = (int) Arr::get($data, 'allocation_id');
+        $additionalIds = collect(Arr::get($data, 'allocation_additional', []))
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => $id > 0 && $id !== $primaryId)
+            ->unique()
+            ->values();
+        $selectedIds = collect([$primaryId])->merge($additionalIds);
+
+        /** @var Collection<int, Allocation> $provided */
+        $provided = Allocation::query()
+            ->whereIn('id', $selectedIds->all())
+            ->lockForUpdate()
+            ->get()
+            ->keyBy('id');
+
+        /** @var Allocation|null $primary */
+        $primary = $provided->get($primaryId);
+        if (is_null($primary) || !is_null($primary->server_id)) {
+            throw new NoViableAllocationException(trans('exceptions.deployment.no_viable_allocations'));
+        }
+
+        foreach ($selectedIds as $id) {
+            /** @var Allocation|null $allocation */
+            $allocation = $provided->get($id);
+            if (
+                is_null($allocation)
+                || !is_null($allocation->server_id)
+                || $allocation->node_id !== (int) Arr::get($data, 'node_id')
+            ) {
+                throw new NoViableAllocationException(trans('exceptions.deployment.no_viable_allocations'));
+            }
+        }
+
+        $missing = max(0, $required - $selectedIds->count());
+        if ($missing > 0) {
+            $query = Allocation::query()
+                ->whereNull('server_id')
+                ->where('node_id', $primary->node_id)
+                ->whereNotIn('id', $selectedIds->all());
+
+            if ($dedicated) {
+                $query->where('ip', $primary->ip);
+            } else {
+                // Prefer allocations on the primary IP, but allow another IP on the same node
+                // when necessary for non-dedicated deployments.
+                $query->orderByRaw('CASE WHEN ip = ? THEN 0 ELSE 1 END', [$primary->ip]);
+            }
+
+            $automatic = $query->orderBy('port')->lockForUpdate()->limit($missing)->get();
+            $selectedIds = $selectedIds->merge($automatic->pluck('id'));
+        }
+
+        if ($selectedIds->count() < $required) {
+            throw new NoViableAllocationException(trans('exceptions.deployment.insufficient_initial_allocations', ['required' => $required, 'available' => $selectedIds->count()]));
+        }
+
+        /** @var Collection<int, Allocation> $allocations */
+        $allocations = Allocation::query()->whereIn('id', $selectedIds->all())->get()->keyBy('id');
+        $ordered = $selectedIds->map(fn ($id) => $allocations->get($id));
+
+        $environment = Arr::get($data, 'environment', []);
+        foreach ($egg->variables as $variable) {
+            if (is_null($variable->allocation_index)) {
+                continue;
+            }
+
+            if ($variable->allocation_index < 1 || $variable->allocation_index > $required) {
+                throw new DisplayException(sprintf('Egg variable %s references allocation %d, but the egg only requires %d allocations.', $variable->env_variable, $variable->allocation_index, $required));
+            }
+
+            /** @var Allocation $allocation */
+            $allocation = $ordered->get($variable->allocation_index - 1);
+            $environment[$variable->env_variable] = (string) $allocation->port;
+        }
+
+        $data['environment'] = $environment;
+        $data['allocation_additional'] = $selectedIds->slice(1)->values()->all();
+
+        return $data;
+    }
+
+    /**
      * Gets an allocation to use for automatic deployment.
      *
      * @throws DisplayException
-     * @throws \Pterodactyl\Exceptions\Service\Deployment\NoViableAllocationException
+     * @throws NoViableAllocationException
      * @throws \Pterodactyl\Exceptions\Service\Deployment\NoViableNodeException
      */
-    private function configureDeployment(array $data, DeploymentObject $deployment): Allocation
+    private function configureDeployment(array $data, DeploymentObject $deployment, int $requiredAllocations): Allocation
     {
         /** @var Collection $nodes */
         $nodes = $this->findViableNodesService->setLocations($deployment->getLocations())
@@ -148,6 +248,7 @@ class ServerCreationService
 
         return $this->allocationSelectionService->setDedicated($deployment->isDedicated())
             ->setNodes($nodes->pluck('id')->toArray())
+            ->setRequiredAllocations($requiredAllocations)
             ->setPorts($deployment->getPorts())
             ->handle();
     }

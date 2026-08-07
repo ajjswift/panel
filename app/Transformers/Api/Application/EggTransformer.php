@@ -53,6 +53,7 @@ class EggTransformer extends BaseTransformer
             'nest' => $model->nest_id,
             'author' => $model->author,
             'description' => $model->description,
+            'initial_allocation_count' => $model->initial_allocation_count,
             // "docker_image" is deprecated, but left here to avoid breaking too many things at once
             // in external software. We'll remove it down the road once things have gotten the chance
             // to upgrade to using "docker_images".

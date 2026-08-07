@@ -24,6 +24,18 @@ describe('managed subdomain readiness', () => {
         ).toMatchObject({ label: 'Waiting for DNS…', tone: 'busy' });
     });
 
+    it('keeps waiting while the node is still confirming DNS propagation', () => {
+        expect(
+            friendlyStatus(
+                record({
+                    proxyDnsStatus: 'confirming',
+                    proxyCertStatus: 'pending',
+                    proxyStatus: 'pending',
+                })
+            )
+        ).toMatchObject({ label: 'Waiting for DNS…', tone: 'busy' });
+    });
+
     it('waits for the certificate after DNS is ready', () => {
         expect(
             friendlyStatus(

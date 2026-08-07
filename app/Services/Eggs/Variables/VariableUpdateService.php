@@ -71,6 +71,7 @@ class VariableUpdateService
             'description' => $data['description'] ?? '',
             'env_variable' => $data['env_variable'] ?? '',
             'default_value' => $data['default_value'] ?? '',
+            'allocation_index' => $data['allocation_index'] ?? null,
             'user_viewable' => in_array('user_viewable', $options),
             'user_editable' => in_array('user_editable', $options),
             'rules' => $data['rules'] ?? '',

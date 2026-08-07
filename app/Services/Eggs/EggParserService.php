@@ -28,7 +28,31 @@ class EggParserService
             throw new InvalidFileUploadException('The JSON file provided is not in a format that can be recognized.');
         }
 
-        return $this->convertToV2($parsed);
+        $parsed = $this->convertToV2($parsed);
+        $allocationCount = filter_var(
+            Arr::get($parsed, 'initial_allocation_count', 1),
+            FILTER_VALIDATE_INT,
+            ['options' => ['min_range' => 1, 'max_range' => 65535]]
+        );
+
+        if ($allocationCount === false) {
+            throw new InvalidFileUploadException('The initial allocation count must be an integer between 1 and 65535.');
+        }
+
+        $parsed['initial_allocation_count'] = $allocationCount;
+        foreach ($parsed['variables'] ?? [] as $variable) {
+            $index = Arr::get($variable, 'allocation_index');
+            if (is_null($index)) {
+                continue;
+            }
+
+            $index = filter_var($index, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+            if ($index === false || $index > $allocationCount) {
+                throw new InvalidFileUploadException('Egg variable allocation indexes must be between 1 and the initial allocation count.');
+            }
+        }
+
+        return $parsed;
     }
 
     /**
@@ -44,6 +68,7 @@ class EggParserService
             'file_denylist' => Collection::make(Arr::get($parsed, 'file_denylist'))
                 ->filter(fn ($value) => !empty($value)),
             'update_url' => Arr::get($parsed, 'meta.update_url'),
+            'initial_allocation_count' => Arr::get($parsed, 'initial_allocation_count', 1),
             'config_files' => Arr::get($parsed, 'config.files'),
             'config_startup' => Arr::get($parsed, 'config.startup'),
             'config_logs' => Arr::get($parsed, 'config.logs'),

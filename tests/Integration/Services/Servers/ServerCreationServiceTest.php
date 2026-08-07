@@ -11,6 +11,7 @@ use GuzzleHttp\Psr7\Response;
 use Pterodactyl\Models\Server;
 use Pterodactyl\Models\Location;
 use Pterodactyl\Models\Allocation;
+use Pterodactyl\Models\EggVariable;
 use Illuminate\Foundation\Testing\WithFaker;
 use GuzzleHttp\Exception\BadResponseException;
 use Illuminate\Validation\ValidationException;
@@ -19,6 +20,7 @@ use Pterodactyl\Tests\Integration\IntegrationTestCase;
 use Pterodactyl\Services\Servers\ServerCreationService;
 use Pterodactyl\Repositories\Wings\DaemonServerRepository;
 use Pterodactyl\Exceptions\Http\Connection\DaemonConnectionException;
+use Pterodactyl\Exceptions\Service\Deployment\NoViableAllocationException;
 
 class ServerCreationServiceTest extends IntegrationTestCase
 {
@@ -205,6 +207,157 @@ class ServerCreationServiceTest extends IntegrationTestCase
         $this->getService()->handle($data);
 
         $this->assertDatabaseMissing('servers', ['owner_id' => $user->id]);
+    }
+
+    public function testEggAutomaticallyAssignsRequiredAllocationsAndMapsTheirPorts(): void
+    {
+        $user = User::factory()->create();
+        $node = Node::factory()->create();
+        $allocations = collect(range(30001, 30004))->map(fn ($port) => Allocation::factory()->create([
+            'node_id' => $node->id,
+            'ip' => '192.0.2.10',
+            'port' => $port,
+        ]));
+        $egg = $this->cloneEggAndVariables($this->bungeecord);
+        $egg->update(['initial_allocation_count' => 3]);
+
+        foreach ([2 => 'RCON_PORT', 3 => 'QUERY_PORT'] as $index => $environmentVariable) {
+            EggVariable::query()->create([
+                'egg_id' => $egg->id,
+                'name' => $environmentVariable,
+                'description' => '',
+                'env_variable' => $environmentVariable,
+                'default_value' => '1',
+                'allocation_index' => $index,
+                'user_viewable' => false,
+                'user_editable' => false,
+                'rules' => 'required|integer',
+            ]);
+        }
+
+        $this->daemonServerRepository->expects('setServer->create')->andReturnUndefined();
+
+        $server = $this->getService()->handle([
+            'name' => $this->faker->name,
+            'description' => $this->faker->sentence,
+            'owner_id' => $user->id,
+            'allocation_id' => $allocations[0]->id,
+            'node_id' => $node->id,
+            'memory' => 256,
+            'swap' => 128,
+            'disk' => 100,
+            'io' => 500,
+            'cpu' => 0,
+            'startup' => 'java server.jar',
+            'image' => 'java:8',
+            'egg_id' => $egg->id,
+            'environment' => [
+                'BUNGEE_VERSION' => 'latest',
+                'SERVER_JARFILE' => 'server.jar',
+                // Mapped values supplied by callers must not override assigned ports.
+                'RCON_PORT' => '12345',
+                'QUERY_PORT' => '12346',
+            ],
+        ]);
+
+        $this->assertCount(3, $server->allocations);
+        $this->assertEqualsCanonicalizing(
+            $allocations->take(3)->pluck('id')->all(),
+            $server->allocations->pluck('id')->all()
+        );
+        $this->assertSame(
+            (string) $allocations[1]->port,
+            $server->variables->firstWhere('env_variable', 'RCON_PORT')->server_value
+        );
+        $this->assertSame(
+            (string) $allocations[2]->port,
+            $server->variables->firstWhere('env_variable', 'QUERY_PORT')->server_value
+        );
+    }
+
+    public function testAutomaticDeploymentSelectsAnIpWithEnoughAllocationsForTheEgg(): void
+    {
+        $user = User::factory()->create();
+        $location = Location::factory()->create();
+        $insufficientNode = Node::factory()->create(['location_id' => $location->id]);
+        $viableNode = Node::factory()->create(['location_id' => $location->id]);
+
+        Allocation::factory()->create([
+            'node_id' => $insufficientNode->id,
+            'ip' => '192.0.2.30',
+            'port' => 30100,
+        ]);
+        $viableAllocations = collect(range(30100, 30102))->map(fn ($port) => Allocation::factory()->create([
+            'node_id' => $viableNode->id,
+            'ip' => '192.0.2.31',
+            'port' => $port,
+        ]));
+
+        $egg = $this->cloneEggAndVariables($this->bungeecord);
+        $egg->update(['initial_allocation_count' => 3]);
+        $deployment = (new DeploymentObject())
+            ->setDedicated(true)
+            ->setLocations([$location->id])
+            ->setPorts(['30100']);
+
+        $this->daemonServerRepository->expects('setServer->create')->andReturnUndefined();
+
+        $server = $this->getService()->handle([
+            'name' => $this->faker->name,
+            'owner_id' => $user->id,
+            'memory' => 256,
+            'swap' => 0,
+            'disk' => 100,
+            'io' => 500,
+            'cpu' => 0,
+            'startup' => 'java server.jar',
+            'image' => 'java:8',
+            'egg_id' => $egg->id,
+            'environment' => [
+                'BUNGEE_VERSION' => 'latest',
+                'SERVER_JARFILE' => 'server.jar',
+            ],
+        ], $deployment);
+
+        $this->assertSame($viableNode->id, $server->node_id);
+        $this->assertEqualsCanonicalizing(
+            $viableAllocations->pluck('id')->all(),
+            $server->allocations->pluck('id')->all()
+        );
+    }
+
+    public function testCreationFailsWhenEggRequiresMoreAllocationsThanAreAvailable(): void
+    {
+        $user = User::factory()->create();
+        $node = Node::factory()->create();
+        $allocations = Allocation::factory()->times(2)->create([
+            'node_id' => $node->id,
+            'ip' => '192.0.2.20',
+        ]);
+        $egg = $this->cloneEggAndVariables($this->bungeecord);
+        $egg->update(['initial_allocation_count' => 3]);
+
+        $this->expectException(NoViableAllocationException::class);
+        $this->expectExceptionMessage('This egg requires 3 ports, but only 2 unassigned allocations are available');
+
+        $this->getService()->handle([
+            'name' => $this->faker->name,
+            'owner_id' => $user->id,
+            'allocation_id' => $allocations[0]->id,
+            'node_id' => $node->id,
+            'memory' => 256,
+            'swap' => 0,
+            'disk' => 100,
+            'io' => 500,
+            'cpu' => 0,
+            'startup' => 'java server.jar',
+            'image' => 'java:8',
+            'egg_id' => $egg->id,
+            'environment' => [
+                'BUNGEE_VERSION' => 'latest',
+                'SERVER_JARFILE' => 'server.jar',
+            ],
+        ]);
     }
 
     private function getService(): ServerCreationService

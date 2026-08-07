@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
  * @property string $description
  * @property string $env_variable
  * @property string $default_value
+ * @property int|null $allocation_index
  * @property bool $user_viewable
  * @property bool $user_editable
  * @property string $rules
@@ -61,6 +62,7 @@ class EggVariable extends Model
         'egg_id' => 'integer',
         'user_viewable' => 'bool',
         'user_editable' => 'bool',
+        'allocation_index' => 'integer',
     ];
 
     public static array $validationRules = [
@@ -69,6 +71,7 @@ class EggVariable extends Model
         'description' => 'string',
         'env_variable' => 'required|regex:/^[\w]{1,191}$/|notIn:' . self::RESERVED_ENV_NAMES,
         'default_value' => 'string',
+        'allocation_index' => 'nullable|integer|min:1',
         'user_viewable' => 'boolean',
         'user_editable' => 'boolean',
         'rules' => 'required|string',

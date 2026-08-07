@@ -33,6 +33,7 @@ class EggUpdateImporterService
 
             // Update existing variables or create new ones.
             foreach ($parsed['variables'] ?? [] as $variable) {
+                $variable = array_merge(['allocation_index' => null], $variable);
                 EggVariable::unguarded(function () use ($egg, $variable) {
                     $egg->variables()->updateOrCreate([
                         'env_variable' => $variable['env_variable'],

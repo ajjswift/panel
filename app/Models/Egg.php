@@ -20,6 +20,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
  * @property array<string, string> $docker_images
  * @property string $update_url
  * @property bool $force_outgoing_ip
+ * @property int $initial_allocation_count
  * @property array|null $file_denylist
  * @property string|null $config_files
  * @property string|null $config_startup
@@ -94,6 +95,7 @@ class Egg extends Model implements Identifiable
         'features',
         'docker_images',
         'force_outgoing_ip',
+        'initial_allocation_count',
         'file_denylist',
         'config_files',
         'config_startup',
@@ -125,6 +127,7 @@ class Egg extends Model implements Identifiable
         'dns_service_profile_id' => 'integer',
         'subdomain_server_override_allowed' => 'boolean',
         'force_outgoing_ip' => 'boolean',
+        'initial_allocation_count' => 'integer',
         'copy_script_from' => 'integer',
         'features' => 'array',
         'docker_images' => 'array',
@@ -150,6 +153,7 @@ class Egg extends Model implements Identifiable
         'config_files' => 'required_without:config_from|nullable|json',
         'update_url' => 'sometimes|nullable|string',
         'force_outgoing_ip' => 'sometimes|boolean',
+        'initial_allocation_count' => 'sometimes|integer|between:1,65535',
         'subdomain_compatibility' => 'sometimes|in:compatible,incompatible',
         'subdomain_default_policy' => 'sometimes|in:enabled,disabled',
         'dns_service_profile_id' => 'nullable|integer|exists:dns_service_profiles,id',
@@ -165,6 +169,7 @@ class Egg extends Model implements Identifiable
         'config_logs' => null,
         'config_files' => null,
         'update_url' => null,
+        'initial_allocation_count' => 1,
     ];
 
     /**

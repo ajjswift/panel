@@ -16,6 +16,8 @@ class AllocationSelectionService
 
     protected array $ports = [];
 
+    protected int $requiredAllocations = 1;
+
     /**
      * AllocationSelectionService constructor.
      */
@@ -42,6 +44,17 @@ class AllocationSelectionService
     public function setNodes(array $nodes): self
     {
         $this->nodes = $nodes;
+
+        return $this;
+    }
+
+    /**
+     * Set the minimum number of unassigned allocations that must exist on the selected node.
+     * Dedicated deployments require all of those allocations to use the selected IP.
+     */
+    public function setRequiredAllocations(int $required): self
+    {
+        $this->requiredAllocations = max(1, $required);
 
         return $this;
     }
@@ -84,7 +97,12 @@ class AllocationSelectionService
      */
     public function handle(): Allocation
     {
-        $allocation = $this->repository->getRandomAllocation($this->nodes, $this->ports, $this->dedicated);
+        $allocation = $this->repository->getRandomAllocation(
+            $this->nodes,
+            $this->ports,
+            $this->dedicated,
+            $this->requiredAllocations
+        );
 
         if (is_null($allocation)) {
             throw new NoViableAllocationException(trans('exceptions.deployment.no_viable_allocations'));

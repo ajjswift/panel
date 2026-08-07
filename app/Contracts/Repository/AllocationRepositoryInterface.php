@@ -15,5 +15,5 @@ interface AllocationRepositoryInterface extends RepositoryInterface
     /**
      * Return a single allocation from those meeting the requirements.
      */
-    public function getRandomAllocation(array $nodes, array $ports, bool $dedicated = false): ?Allocation;
+    public function getRandomAllocation(array $nodes, array $ports, bool $dedicated = false, int $required = 1): ?Allocation;
 }

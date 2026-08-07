@@ -13,6 +13,7 @@ class EggFormRequest extends AdminFormRequest
             'description' => 'nullable|string',
             'docker_images' => ['required', 'string', 'regex:/^[\w#\.\/\- ]*\|?~?[\w\.\/\-:@ ]*$/im'],
             'force_outgoing_ip' => 'sometimes|boolean',
+            'initial_allocation_count' => 'required|integer|between:1,65535',
             'game_switch_enabled' => 'sometimes|boolean',
             'subdomain_compatibility' => 'sometimes|in:compatible,incompatible',
             'subdomain_default_policy' => 'sometimes|in:enabled,disabled',
@@ -40,6 +41,19 @@ class EggFormRequest extends AdminFormRequest
     {
         $validator->sometimes('config_from', 'exists:eggs,id', function () {
             return (int) $this->input('config_from') !== 0;
+        });
+
+        $validator->after(function ($validator) {
+            $egg = $this->route('egg');
+            if (
+                $egg
+                && $egg->variables()->where('allocation_index', '>', (int) $this->input('initial_allocation_count'))->exists()
+            ) {
+                $validator->errors()->add(
+                    'initial_allocation_count',
+                    'The initial port count cannot be lower than a port number assigned to an egg variable.'
+                );
+            }
         });
     }
 
