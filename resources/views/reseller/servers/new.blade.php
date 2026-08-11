@@ -52,7 +52,10 @@
                         </div>
                         <div class="form-group">
                             <div class="checkbox checkbox-primary no-margin-bottom">
-                                <input id="pStartOnCreation" name="start_on_completion" type="checkbox" {{ \Pterodactyl\Helpers\Utilities::checked('start_on_completion', 1) }} />
+                                {{-- value="1" is required: a checkbox without it submits the
+                                     string "on", which fails the `boolean` rule. The admin
+                                     form omits it only because it never validates this field. --}}
+                                <input id="pStartOnCreation" name="start_on_completion" type="checkbox" value="1" {{ \Pterodactyl\Helpers\Utilities::checked('start_on_completion', 1) }} />
                                 <label for="pStartOnCreation" class="strong">Start Server when Installed</label>
                             </div>
                         </div>

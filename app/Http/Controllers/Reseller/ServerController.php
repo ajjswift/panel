@@ -7,11 +7,13 @@ use Illuminate\Http\Request;
 use Pterodactyl\Models\Nest;
 use Pterodactyl\Models\Node;
 use Pterodactyl\Models\Server;
+use Pterodactyl\Models\Allocation;
 use Illuminate\Http\RedirectResponse;
 use Prologue\Alerts\AlertsMessageBag;
 use Pterodactyl\Http\Controllers\Controller;
 use Pterodactyl\Services\Resellers\ResellerContext;
 use Pterodactyl\Services\Servers\SuspensionService;
+use Pterodactyl\Repositories\Eloquent\NestRepository;
 use Pterodactyl\Services\Servers\ServerCreationService;
 use Pterodactyl\Services\Servers\ServerDeletionService;
 use Pterodactyl\Services\Resellers\ResellerQuotaService;
@@ -30,6 +32,7 @@ class ServerController extends Controller
         private DetailsModificationService $detailsModificationService,
         private ServerCreationService $creationService,
         private ServerDeletionService $deletionService,
+        private NestRepository $nestRepository,
         private ResellerQuotaService $quota,
         private SuspensionService $suspensionService,
     ) {
@@ -60,7 +63,10 @@ class ServerController extends Controller
             return redirect()->route('reseller.index');
         }
 
-        $nests = Nest::query()->with('eggs')->get();
+        // getWithEggs() eager-loads `eggs.variables`, which new-server.js needs to
+        // render the Service Variables inputs. A plain with('eggs') leaves that
+        // relation off the payload and the section renders empty.
+        $nests = $this->nestRepository->getWithEggs();
 
         \JavaScript::put([
             'nodeData' => $this->nodeDataForSelects($nodes),
@@ -177,19 +183,21 @@ class ServerController extends Controller
      * the nodes this reseller has been granted.
      *
      * @param \Illuminate\Database\Eloquent\Collection<int, Node> $nodes
+     *
+     * @return array<int, array{id: int, text: string, allocations: array<int, array{id: int, text: string}>}>
      */
     private function nodeDataForSelects($nodes): array
     {
         return $nodes->map(function (Node $node) {
             return [
-                'id' => $node->id,
-                'text' => $node->name,
+                'id' => (int) $node->id,
+                'text' => (string) $node->name,
                 'allocations' => $node->allocations
                     ->where('server_id', null)
-                    ->map(fn ($allocation) => [
-                        'id' => $allocation->id,
+                    ->map(fn (Allocation $allocation) => [
+                        'id' => (int) $allocation->id,
                         'text' => sprintf('%s:%s', $allocation->ip, $allocation->port),
-                    ])->values(),
+                    ])->values()->all(),
             ];
         })->values()->all();
     }
