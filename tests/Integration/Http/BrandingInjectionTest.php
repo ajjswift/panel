@@ -84,6 +84,18 @@ class BrandingInjectionTest extends HttpTestCase
         $this->assertStringContainsString('<title>Nova Hosting</title>', $content);
         $this->assertStringContainsString('"name":"Nova Hosting"', $content, 'The SPA should be told the reseller name.');
         $this->assertStringNotContainsString('--gray-', $content, 'The neutral ramp must never be overridden.');
+
+        // Presence alone is not enough, and asserting only that is how this
+        // shipped broken once. The bundle uses style-loader, so tailwind.css is
+        // injected by JS *after* this block; at equal specificity a plain
+        // `:root` here loses to the stock ramp and the page renders unbranded
+        // even though every assertion above passes. PHPUnit can't evaluate the
+        // cascade, so guard the selector that makes the cascade come out right.
+        $this->assertStringContainsString(
+            ':root:root {',
+            $content,
+            'The override must use a doubled :root selector to outrank the runtime-injected theme CSS.'
+        );
     }
 
     private function createBrandedReseller(array $attributes = []): Reseller
