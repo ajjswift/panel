@@ -32,6 +32,7 @@ interface ExtendedWindow extends Window {
         updated_at: string;
         created_at: string;
         /* eslint-enable camelcase */
+        reseller: boolean;
     };
 }
 
@@ -46,6 +47,7 @@ const App = () => {
             email: PterodactylUser.email,
             language: PterodactylUser.language,
             rootAdmin: PterodactylUser.root_admin,
+            reseller: PterodactylUser.reseller,
             useTotp: PterodactylUser.use_totp,
             createdAt: new Date(PterodactylUser.created_at),
             updatedAt: new Date(PterodactylUser.updated_at),

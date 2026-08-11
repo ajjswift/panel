@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
 use Pterodactyl\Extensions\Themes\Theme;
+use Pterodactyl\Services\Resellers\ResellerContext;
 use Illuminate\Database\Eloquent\Relations\Relation;
 
 class AppServiceProvider extends ServiceProvider
@@ -47,6 +48,8 @@ class AppServiceProvider extends ServiceProvider
             'game_switch_operation' => Models\GameSwitchOperation::class,
             'managed_domain' => Models\ManagedDomain::class,
             'managed_subdomain' => Models\ManagedSubdomain::class,
+            'reseller' => Models\Reseller::class,
+            'reseller_domain' => Models\ResellerDomain::class,
             'schedule' => Models\Schedule::class,
             'server' => Models\Server::class,
             'ssh_key' => Models\UserSSHKey::class,
@@ -69,6 +72,11 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton('extensions.themes', function () {
             return new Theme();
         });
+
+        // Scoped so the resolved reseller (and its cached quota usage) lives for
+        // exactly one request and never leaks between queued jobs or octane
+        // requests.
+        $this->app->scoped(ResellerContext::class);
     }
 
     /**

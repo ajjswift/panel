@@ -13,10 +13,12 @@ use Illuminate\Database\Eloquent\Builder;
 use Pterodactyl\Contracts\Models\Identifiable;
 use Pterodactyl\Models\Traits\HasAccessTokens;
 use Illuminate\Auth\Passwords\CanResetPassword;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Pterodactyl\Traits\Helpers\AvailableLanguages;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\Access\Authorizable;
 use Pterodactyl\Models\Traits\HasRealtimeIdentifier;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Contracts\Auth\Authenticatable as AuthenticatableContract;
@@ -38,6 +40,9 @@ use Pterodactyl\Notifications\SendPasswordReset as ResetPasswordNotification;
  * @property string|null $remember_token
  * @property string $language
  * @property bool $root_admin
+ * @property int|null $reseller_id
+ * @property Reseller|null $reseller
+ * @property Reseller|null $parentReseller
  * @property bool $use_totp
  * @property string|null $totp_secret
  * @property \Illuminate\Support\Carbon|null $totp_authenticated_at
@@ -135,6 +140,10 @@ class User extends Model implements
         'totp_authenticated_at',
         'gravatar',
         'root_admin',
+        // Only ever set by the code that owns tenancy (the reseller panel and
+        // the admin reseller screens); every form request that touches users
+        // strips this key from the incoming payload first.
+        'reseller_id',
     ];
 
     /**
@@ -142,6 +151,7 @@ class User extends Model implements
      */
     protected $casts = [
         'root_admin' => 'boolean',
+        'reseller_id' => 'integer',
         'use_totp' => 'boolean',
         'gravatar' => 'boolean',
         'totp_authenticated_at' => 'datetime',
@@ -175,6 +185,7 @@ class User extends Model implements
         'name_last' => 'required|string|between:1,191',
         'password' => 'sometimes|nullable|string',
         'root_admin' => 'boolean',
+        'reseller_id' => 'sometimes|nullable|integer|exists:resellers,id',
         'language' => 'string',
         'use_totp' => 'boolean',
         'totp_secret' => 'nullable|string',
@@ -201,7 +212,11 @@ class User extends Model implements
     public function toVueObject(): array
     {
         return Collection::make($this->toArray())->except(['id', 'external_id'])
-            ->merge(['identifier' => $this->identifier])
+            ->merge([
+                'identifier' => $this->identifier,
+                // Drives the "Reseller" entry in the client-area sidebar.
+                'reseller' => $this->isReseller(),
+            ])
             ->toArray();
     }
 
@@ -244,6 +259,45 @@ class User extends Model implements
     public function servers(): HasMany
     {
         return $this->hasMany(Server::class, 'owner_id');
+    }
+
+    /**
+     * The reseller organisation this account *owns*, if any. Distinct from
+     * parentReseller(), which is the reseller this account is a tenant of — an
+     * account is never both.
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasOne<\Pterodactyl\Models\Reseller, $this>
+     */
+    public function reseller(): HasOne
+    {
+        return $this->hasOne(Reseller::class, 'user_id');
+    }
+
+    /**
+     * The reseller this account belongs to as a tenant, if any.
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo<\Pterodactyl\Models\Reseller, $this>
+     */
+    public function parentReseller(): BelongsTo
+    {
+        return $this->belongsTo(Reseller::class, 'reseller_id');
+    }
+
+    /**
+     * Whether this account owns an enabled reseller organisation. A disabled
+     * reseller keeps its data but loses access to the reseller panel.
+     */
+    public function isReseller(): bool
+    {
+        return (bool) $this->reseller?->enabled;
+    }
+
+    /**
+     * Whether this account is managed by a reseller.
+     */
+    public function isResellerTenant(): bool
+    {
+        return !is_null($this->reseller_id);
     }
 
     /**

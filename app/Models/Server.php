@@ -3,6 +3,7 @@
 namespace Pterodactyl\Models;
 
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\JoinClause;
 use Znck\Eloquent\Traits\BelongsToThrough;
 use Pterodactyl\Contracts\Models\Identifiable;
@@ -244,6 +245,24 @@ class Server extends Model implements Identifiable
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class, 'owner_id');
+    }
+
+    /**
+     * Limits the query to servers belonging to a reseller. Tenancy is derived
+     * from the owner's `reseller_id` rather than denormalised onto the server,
+     * so this scope is the single definition of "belongs to this reseller" and
+     * every reseller-scoped query must go through it.
+     *
+     * @param \Illuminate\Database\Eloquent\Builder<$this> $query
+     */
+    public function scopeForReseller(Builder $query, Reseller|int $reseller): void
+    {
+        $id = $reseller instanceof Reseller ? $reseller->id : $reseller;
+
+        $query->whereIn(
+            'servers.owner_id',
+            User::query()->select('id')->where('reseller_id', $id)
+        );
     }
 
     /**

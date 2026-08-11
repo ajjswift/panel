@@ -10,6 +10,7 @@ use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Support\Facades\RateLimiter;
 use Pterodactyl\Http\Middleware\TrimStrings;
 use Pterodactyl\Http\Middleware\AdminAuthenticate;
+use Pterodactyl\Http\Middleware\ResellerAuthenticate;
 use Pterodactyl\Http\Middleware\RequireTwoFactorAuthentication;
 use Illuminate\Foundation\Support\Providers\RouteServiceProvider as ServiceProvider;
 
@@ -43,6 +44,10 @@ class RouteServiceProvider extends ServiceProvider
                 Route::middleware(['auth.session', RequireTwoFactorAuthentication::class, AdminAuthenticate::class])
                     ->prefix('/admin')
                     ->group(base_path('routes/admin.php'));
+
+                Route::middleware(['auth.session', RequireTwoFactorAuthentication::class, ResellerAuthenticate::class])
+                    ->prefix('/reseller')
+                    ->group(base_path('routes/reseller.php'));
 
                 Route::middleware('guest')->prefix('/auth')->group(base_path('routes/auth.php'));
             });

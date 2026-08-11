@@ -11,6 +11,11 @@
     background-image: var(--gradient-brand);
 }
 
+/* A reseller's uploaded logo, standing in for the generated brand mark. */
+.brand_logo {
+    @apply w-8 h-8 rounded-md object-contain shrink-0;
+}
+
 .brand_name {
     @apply font-header font-semibold text-base text-body truncate;
 }

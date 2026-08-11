@@ -2,6 +2,8 @@ import { action, Action } from 'easy-peasy';
 
 export interface SiteSettings {
     name: string;
+    /** A reseller's logo, when the request resolved to one. Null on the stock panel. */
+    logo: string | null;
     locale: string;
     recaptcha: {
         enabled: boolean;

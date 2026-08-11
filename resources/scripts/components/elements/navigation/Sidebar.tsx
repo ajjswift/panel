@@ -7,6 +7,7 @@ import {
     faAngleDoubleRight,
     faCogs,
     faExternalLinkAlt,
+    faHandshake,
     faSearch,
     faSignOutAlt,
     faUserCircle,
@@ -168,7 +169,9 @@ export default ({
     showAccountLink = true,
 }: Props) => {
     const name = useStoreState((state: ApplicationStore) => state.settings.data!.name);
+    const logo = useStoreState((state: ApplicationStore) => state.settings.data!.logo);
     const rootAdmin = useStoreState((state: ApplicationStore) => state.user.data!.rootAdmin);
+    const reseller = useStoreState((state: ApplicationStore) => state.user.data!.reseller);
     const [isLoggingOut, setIsLoggingOut] = useState(false);
     const [searchVisible, setSearchVisible] = useState(false);
 
@@ -189,9 +192,13 @@ export default ({
                 <SearchModal appear visible={searchVisible} onDismissed={() => setSearchVisible(false)} />
             )}
             <Link to={'/'} className={styles.brand} aria-label={name}>
-                <div className={styles.brand_mark} aria-hidden>
-                    {(name || 'P').charAt(0).toUpperCase()}
-                </div>
+                {logo ? (
+                    <img src={logo} alt={''} className={styles.brand_logo} aria-hidden />
+                ) : (
+                    <div className={styles.brand_mark} aria-hidden>
+                        {(name || 'P').charAt(0).toUpperCase()}
+                    </div>
+                )}
                 {!isCollapsed && <div className={styles.brand_name}>{name}</div>}
             </Link>
             {header && !isCollapsed && <div className={'px-4 pb-2 shrink-0'}>{header}</div>}
@@ -223,6 +230,12 @@ export default ({
                 {rootAdmin && (
                     <NavItem
                         item={{ label: 'Admin', icon: faCogs, href: '/admin', external: true }}
+                        collapsed={isCollapsed}
+                    />
+                )}
+                {reseller && (
+                    <NavItem
+                        item={{ label: 'Reseller', icon: faHandshake, href: '/reseller', external: true }}
                         collapsed={isCollapsed}
                     />
                 )}

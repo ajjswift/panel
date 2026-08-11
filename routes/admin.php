@@ -113,6 +113,25 @@ Route::group(['prefix' => 'users'], function () {
 
 /*
 |--------------------------------------------------------------------------
+| Reseller Controller Routes
+|--------------------------------------------------------------------------
+|
+| Endpoint: /admin/resellers
+|
+*/
+Route::group(['prefix' => 'resellers'], function () {
+    Route::get('/', [Admin\ResellerController::class, 'index'])->name('admin.resellers');
+    Route::get('/new', [Admin\ResellerController::class, 'create'])->name('admin.resellers.new');
+    Route::get('/view/{reseller:id}', [Admin\ResellerController::class, 'view'])->name('admin.resellers.view');
+
+    Route::post('/new', [Admin\ResellerController::class, 'store']);
+
+    Route::patch('/view/{reseller:id}', [Admin\ResellerController::class, 'update']);
+    Route::delete('/view/{reseller:id}', [Admin\ResellerController::class, 'delete'])->name('admin.resellers.delete');
+});
+
+/*
+|--------------------------------------------------------------------------
 | Server Controller Routes
 |--------------------------------------------------------------------------
 |

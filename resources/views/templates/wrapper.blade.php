@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
     <head>
-        <title>{{ config('app.name', 'Pterodactyl') }}</title>
+        <title>{{ $resellerBranding->appName ?? config('app.name', 'Pterodactyl') }}</title>
 
         {{-- Apply the persisted theme before first paint to avoid a flash of the wrong theme. --}}
         <script>
@@ -30,9 +30,9 @@
             <link rel="icon" type="image/png" href="/favicons/favicon-16x16.png" sizes="16x16">
             <link rel="manifest" href="/favicons/manifest.json">
             <link rel="mask-icon" href="/favicons/safari-pinned-tab.svg" color="#bc6e3c">
-            <link rel="shortcut icon" href="/favicons/favicon.ico">
+            <link rel="shortcut icon" href="{{ $resellerBranding->faviconUrl ?? '/favicons/favicon.ico' }}">
             <meta name="msapplication-config" content="/favicons/browserconfig.xml">
-            <meta name="theme-color" content="#0e4688">
+            <meta name="theme-color" content="{{ $resellerBranding->brandHex ?? '#0e4688' }}">
         @show
 
         @section('user-data')
@@ -51,6 +51,22 @@
         @yield('assets')
 
         @include('layouts.scripts')
+
+        {{--
+            Reseller white-label overrides. Must come after the bundle's stylesheet
+            so it wins, and only touches the brand/accent ramps — both theme blocks
+            in tailwind.css reference those through var(), so one :root override
+            re-colors light and dark alike. Every value here is a server-generated
+            numeric triplet or a validated hex; nothing user-typed is interpolated
+            raw.
+        --}}
+        @if(isset($resellerBranding) && !$resellerBranding->isEmpty())
+            <style id="reseller-branding">
+                :root {
+            {!! $resellerBranding->cssVariables() !!}
+                }
+            </style>
+        @endif
     </head>
     <body class="{{ $css['body'] ?? 'bg-neutral-50' }}">
         @section('content')

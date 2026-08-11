@@ -14,4 +14,7 @@ Route::get('/locales/locale.json', Base\LocaleController::class)
     ->where('namespace', '.*');
 
 Route::get('/{react}', [Base\IndexController::class, 'index'])
-    ->where('react', '^(?!(\/)?(api|auth|admin|daemon)).+');
+    // "reseller" is excluded for the same reason as "admin": it is a
+    // server-rendered area, not a client-side route, and this catch-all is
+    // registered before it.
+    ->where('react', '^(?!(\/)?(api|auth|admin|reseller|daemon)).+');
