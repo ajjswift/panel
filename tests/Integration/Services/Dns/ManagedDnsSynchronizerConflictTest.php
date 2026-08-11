@@ -80,6 +80,7 @@ class ManagedDnsSynchronizerConflictTest extends IntegrationTestCase
         $factory->method('for')->willReturn($provider);
         $policy = new SubdomainPolicyResult(
             enabled: true,
+            visible: true,
             canView: true,
             canCreate: true,
             canUpdate: true,

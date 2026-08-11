@@ -221,6 +221,7 @@ class ManagedSubdomainPreviewServiceTest extends TestCase
         ]);
         $policy = new SubdomainPolicyResult(
             enabled: true,
+            visible: true,
             canView: true,
             canCreate: true,
             canUpdate: true,

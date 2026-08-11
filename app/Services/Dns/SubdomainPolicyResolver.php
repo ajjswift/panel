@@ -40,8 +40,11 @@ class SubdomainPolicyResolver
         } elseif ($enabled && ($limit === 0 || $used >= $limit)) {
             [$reasonCode, $reason] = ['limit_reached', sprintf('This server is using all %d of its available managed subdomains.', $limit)];
         }
-        $canCreate = $enabled
-            && is_null($reasonCode)
+        // The server's own entitlement, before the viewer's permissions are
+        // considered — a subuser who merely lacks the create permission must
+        // not make the section look unavailable for the whole server.
+        $allowsCreate = $enabled && is_null($reasonCode);
+        $canCreate = $allowsCreate
             && (!$user || $user->can(Permission::ACTION_SUBDOMAIN_CREATE, $server));
 
         $warnings = [];
@@ -55,6 +58,7 @@ class SubdomainPolicyResolver
 
         return new SubdomainPolicyResult(
             enabled: $enabled,
+            visible: $this->visible($allowsCreate, $used, $reasonCode),
             canView: $canView,
             canCreate: $canCreate,
             canUpdate: $canUpdate,
@@ -69,6 +73,29 @@ class SubdomainPolicyResolver
             disabledReasonCode: $reasonCode,
             warnings: $warnings,
         );
+    }
+
+    /**
+     * Reasons that describe a temporary condition rather than a deliberate
+     * decision about this server. The Domains area stays visible for these so
+     * the user can see why it is unavailable and watch it come back.
+     */
+    private const TRANSIENT_REASONS = ['no_available_domains', 'game_switch_in_progress'];
+
+    /**
+     * Whether the Domains area should be offered at all. A server that is
+     * deliberately allowed no managed hostnames — limit of zero, an
+     * incompatible game, or the feature switched off for it — has nothing to
+     * show and nothing to do there, so the client hides the section entirely
+     * instead of presenting a dead end. Existing hostnames always keep it
+     * visible, even if the allowance was later reduced to zero, so records can
+     * still be inspected and removed.
+     */
+    private function visible(bool $allowsCreate, int $used, ?string $reasonCode): bool
+    {
+        return $used > 0
+            || $allowsCreate
+            || in_array($reasonCode, self::TRANSIENT_REASONS, true);
     }
 
     /**

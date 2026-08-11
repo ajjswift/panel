@@ -13,6 +13,7 @@ final readonly class SubdomainPolicyResult
      */
     public function __construct(
         public bool $enabled,
+        public bool $visible,
         public bool $canView,
         public bool $canCreate,
         public bool $canUpdate,
@@ -33,6 +34,7 @@ final readonly class SubdomainPolicyResult
     {
         return [
             'enabled' => $this->enabled,
+            'visible' => $this->visible,
             'can_view' => $this->canView,
             'can_create' => $this->canCreate,
             'can_update' => $this->canUpdate,

@@ -9,6 +9,12 @@ export interface ManagedDomainOption {
 
 export interface SubdomainPolicy {
     enabled: boolean;
+    /**
+     * Whether the Domains section should be offered at all. False for servers
+     * deliberately allowed no managed hostnames, so the tab is hidden rather
+     * than leading to a dead end.
+     */
+    visible: boolean;
     canView: boolean;
     canCreate: boolean;
     canUpdate: boolean;
@@ -114,6 +120,7 @@ const recordPlan = (plan: any): DnsRecordPreview => {
 
 const policy = (data: any): SubdomainPolicy => ({
     enabled: data.enabled,
+    visible: data.visible,
     canView: data.can_view,
     canCreate: data.can_create,
     canUpdate: data.can_update,
